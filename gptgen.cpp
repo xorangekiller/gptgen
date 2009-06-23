@@ -272,18 +272,17 @@ bool cmp(part a, part b)
 
 #ifdef WE_ARE_WINDOWS
 /******************************************************************************\
-* read_tbl: read an MSDOS-style partition table from a block of a device       *
+* read_block: read a logical block of data from a device                       *
 * drive: filename of the device (e.g. \\.\physicaldrive0)                      *
 * lba: logical address of the block to parse                                   *
 * block_size: size of a block on the device                                    *
 * buf: buffer to read data into                                                *
 \******************************************************************************/
-int read_tbl(string drive, uint64_t lba, int block_size, char *buf)
+int read_block(string drive, uint64_t lba, int block_size, char *buf)
 {
 	HANDLE fin;
 	DWORD writelen;
 	LARGE_INTEGER offset;
-	unsigned char tmpbuf[block_size];
 	
 	offset.QuadPart = lba*block_size;
 
@@ -297,9 +296,9 @@ int read_tbl(string drive, uint64_t lba, int block_size, char *buf)
 	}
 	
 	SetFilePointerEx(fin, offset, NULL, FILE_BEGIN);
-	ReadFile(fin, tmpbuf, block_size, &writelen, NULL);
+	ReadFile(fin, buf, block_size, &writelen, NULL);
 	CloseHandle(fin);
-	memcpy(buf, tmpbuf+446, 64);
+	
 	return 0;
 }
 
@@ -361,30 +360,21 @@ uint64_t get_capacity(string drive)
 }		
 #else
 /******************************************************************************\
-* read_tbl: read an MSDOS-style partition table from a block of a device       *
+* read_block: read a logical block of data from a device                       *
 * drive: filename of the device (e.g. /dev/hda or /dev/sda)                    *
 * lba: logical address of the block to parse                                   *
 * block_size: size of a block on the device                                    *
 * buf: buffer to read data into                                                *
 \******************************************************************************/
-int read_tbl(string drive, uint64_t lba, int block_size, char *buf)
+int read_block(string drive, uint64_t lba, int block_size, char *buf)
 {
 	ifstream fin;
-#ifndef SIMPLE_LINUX_RW
-	unsigned char tmpbuf[block_size];
-#endif
 	
 	fin.open(drive.c_str(), ios_base::binary);
 	if (!fin)
 		return -1;
-#ifdef SIMPLE_LINUX_RW
-	fin.seekg((lba*block_size)+446);
-	fin.read(buf, sizeof(struct mbrpart)*4);
-#else
 	fin.seekg(lba*block_size);
 	fin.read(tmpbuf, block_size);
-	memcpy(buf, tmpbuf+446, 64);
-#endif
 	fin.close();
 	return 0;
 }
@@ -452,6 +442,41 @@ uint64_t get_capacity(string drive)
 }
 #endif
 #endif
+
+/******************************************************************************\
+* read_tbl: read an MSDOS-style partition table from a block of a device       *
+* drive: filename of the device (e.g. \\.\physicaldrive0 or /dev/hda)          *
+* lba: logical address of the block to parse                                   *
+* block_size: size of a block on the device                                    *
+* buf: buffer to read data into                                                *
+\******************************************************************************/
+int read_tbl(string drive, uint64_t lba, int block_size, char *buf)
+{
+	char tmpbuf[block_size];
+	int ret;
+	
+	ret = read_block(drive, lba, block_size, tmpbuf);
+	if (ret >= 0) memcpy(buf, tmpbuf+446, 64);
+	return ret;
+}
+
+/******************************************************************************\
+* read_mbr: read an MBR-style (446 byte) boot code from a block of a device    *
+* drive: filename of the device (e.g. \\.\physicaldrive0 or /dev/hda)          *
+* lba: logical address of the block to parse                                   *
+* block_size: size of a block on the device                                    *
+* buf: buffer to read data into                                                *
+\******************************************************************************/
+
+int read_mbr(string drive, uint64_t lba, int block_size, char *buf)
+{
+	char tmpbuf[block_size];
+	int ret;
+	
+	ret = read_block(drive, lba, block_size, tmpbuf);
+	if (ret >= 0) memcpy(buf, tmpbuf, 446);
+	return ret;
+}
 
 /******************************************************************************\
 * parse_tbl: parse an MSDOS-style partition table extracted from a boot record *
@@ -840,6 +865,11 @@ int main(int argc, char *argv[])
 		memset((char *)outbuf, 0, 20000);
 		
 		if (!keepmbr) {
+			// grab the MBR loader code and put it into the protective MBR
+			if (read_mbr(drive, 0, 512, outbuf) < 0) {
+				cout << "Block read failed!" << endl;
+				return EXIT_FAILURE;
+			}
 			memcpy((char *)outbuf+446, (char *)&prot_mbr, sizeof(struct mbrpart));
 			outbuf[510] = 0x55;
 			outbuf[511] = 0xAA;
@@ -874,8 +904,14 @@ int main(int argc, char *argv[])
 		
 		fout.open("primary.img", ios_base::binary);
 		if (!keepmbr) {
-			for (int i = 0; i < 446; i++)
-				fout << '\0';
+			char mbrbuf[446];
+			
+			// grab the MBR loader code and put it into the protective MBR
+			if (read_mbr(drive, 0, 512, mbrbuf) < 0) {
+				cout << "Block read failed!" << endl;
+				return EXIT_FAILURE;
+			}
+			fout.write(mbrbuf, 446);
 			fout.write((char *)&prot_mbr, sizeof(struct mbrpart));
 			for (int i = 0; i < 48; i++)
 				fout << '\0';
