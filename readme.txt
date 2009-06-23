@@ -1,4 +1,4 @@
-README for gptgen v0.1
+README for gptgen v0.2pre
 
 1. Introduction
 
@@ -58,10 +58,13 @@ reuse this code for that purpose.)
   newer Windows systems with UAC enabled, you may need to run gptgen
   from an elevated command prompt. On Linux, "sudo" probably suffices.
 * Gptgen is completely untested on Linux, though necessary code is in-
-  cluded to support the platform. To compile on linux, comment out the
+  cluded to support the platform. To compile on Linux, comment out the
   "#define WE_ARE_WINDOWS 1" line, and compile gptgen.cpp with g++, no
   makefile is provided at this point (though later versions will likely
   include one). Windows users can use Dev-C++ to compile.
+* Endianness is not auto-detected, you need to uncomment the line
+  "#define WE_ARE_BIG_ENDIAN 1" in gptgen.cpp to compile on big-endian
+  platforms. Big-endian support is also completely untested.
 * Gptgen doesn't yet support drives with a block size other than 512
   bytes. This may change in the future. All calculations below assume
   a block size of 512 bytes.
@@ -92,3 +95,8 @@ to the disk.
 On Linux, the syntax is "gptgen [-w] /dev/hda", "/dev/hda" being the
 block device representing the physical drive to be converted. The -w
 option works the same way as on Windows.
+You can add the -m parameter to the command line to preserve the exis-
+ting MBR on the disk, instead of writing a protective MBR. This is not
+recommended, and may prevent recognition of the drive as GPT on some
+systems, but it is useful when you want to be extra safe, and verify
+the newly-written GPT before wiping out the MBR.

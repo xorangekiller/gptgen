@@ -1,5 +1,5 @@
 /******************************************************************************\
-* gptgen version 0.1                                                           *
+* gptgen version 0.2pre                                                        *
 * Utility for converting MBR/MSDOS-partitioned disk drives                     *
 * to GUID Partition Table.                                                     *
 *                                                                              *
@@ -128,7 +128,7 @@ struct __guid {
 	cpu_to_le16(0x11B2), cpu_to_be64(0x99A6080020736631ULL)}
 
 #define MBR2GUID(x) {cpu_to_le32(0x1575DA16), cpu_to_le16(0xF2E2),\
-	cpu_to_le16(0x40DE), (cpu_to_be64(0xB715C6E376663B00ULL | x))}
+	cpu_to_le16(0x40DE), (cpu_to_be64(0xB715C6E376663B00ULL + x))}
 
 struct part {
 	unsigned char type;
@@ -488,12 +488,13 @@ uint32_t parse_tbl(struct mbrpart *curr,
 \******************************************************************************/
 void usage(char *name)
 {
-	cout << "Usage: " << endl;
-	cout << "Write to separate files: " << name << " <device_path>" << endl;
-	cout << "Write directly to disk: " << name << " -w <device_path>" << endl;
+	cout << "Usage: " << name << "[<arguments>] <device_path>" << endl;
 	cout << "where device_path is the full path to the device file," << endl;
 	cout << "e.g. /dev/hda or \\\\.\\physicaldrive0." << endl;
-	cout << name << " -h or " << name << " --help displays this help." << endl;
+	cout << "Available arguments (no \"-wm\"-style argument combining support):" << endl;
+	cout << "-w, --write: write directly to the disk, not to separate files" << endl;
+	cout << "-m, --keepmbr: keep the existing MBR, don't write a protective MBR" << endl;
+	cout << "-h, --help, --usage: display this help message" << endl;
 	return;
 }
 
@@ -510,19 +511,22 @@ int main(int argc, char *argv[])
 	string drive;
 	uint64_t disk_len;
 	uint32_t first_ebr = 0, curr_ebr = 0;
-	bool write = false, badlayout = false, boot = false;
+	bool write = false, badlayout = false, boot = false, keepmbr = false;
 
 	memset((void *)curr, 0, 64);
 	
-	cout << argv[0] << ": Convert an MBR partition table "
-		 << "to a GPT one." << endl;
+	cout << argv[0] << "Partition table converter "
+		 << "v0.2pre" << endl;
 	cout << endl;
 	
 	// XXX The command-line parsing code has room for improvements...
 	for (int i = 1; i < argc; i++) {
-		if (!strcmp(argv[i], "-w")) {
+		if (!strcmp(argv[i], "-w") || !strcmp(argv[i], "--write")) {
 			write = true;
-		} else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help")) {
+		} else if (!strcmp(argv[i], "-m") || !strcmp(argv[i], "--keepmbr")) {
+			keepmbr = true;
+		} else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help") ||
+				   !strcmp(argv[i], "--usage")) {
 			usage(argv[0]);
 			return EXIT_SUCCESS;
 		} else if (argv[i][0] == '-') {
@@ -530,19 +534,19 @@ int main(int argc, char *argv[])
 			cout << argv[0] << ": Invalid argument: " << argv[i] << "." << endl;
 			return EXIT_FAILURE;
 		} else {
-			drive = argv[i];
+			if (!drive.length()) {
+				drive = argv[i];
+			} else {
+				usage(argv[0]);
+				cout << argv[0] << ": Too many arguments (" << argc << ")." << endl;
+				return EXIT_FAILURE;
+			}
 		}
 	}
 	
 	if (argc <= 1) {
 		usage(argv[0]);
 		return EXIT_SUCCESS;
-	}
-	
-	if (argc > 3 || (argc == 3 && write == false)) {
-		usage(argv[0]);
-		cout << argv[0] << ": Too many arguments (" << argc << ")." << endl;
-		return EXIT_FAILURE;
 	}
 	
 	if (!drive.length()) {
@@ -827,20 +831,31 @@ int main(int argc, char *argv[])
 	};
 	
 	if (write) { // FIXME Write-to-disk could be improved...
-		cout << "Writing primary GPT and protective MBR to LBA address 0..." << endl;
+		cout << "Writing primary GPT ";
+		if (!keepmbr) cout << "and protective MBR ";
+		cout << "to LBA address " << (keepmbr ? "1" : "0") << "..." << endl;
 		
 		char outbuf[20000];
 		
 		memset((char *)outbuf, 0, 20000);
 		
-		memcpy((char *)outbuf+446, (char *)&prot_mbr, sizeof(struct mbrpart));
-		outbuf[510] = 0x55;
-		outbuf[511] = 0xAA;
-		memcpy((char *)outbuf+512, (char *)&hdr1, sizeof(struct gpthdr));
-		memcpy((char *)outbuf+1024, (char *)gpttable, sizeof(gpttable));
-		if (write_data(drive, 0, 512, outbuf, 34) < 0) {
-			cout << "Failed to write primary GPT!" << endl;
-			return EXIT_FAILURE;
+		if (!keepmbr) {
+			memcpy((char *)outbuf+446, (char *)&prot_mbr, sizeof(struct mbrpart));
+			outbuf[510] = 0x55;
+			outbuf[511] = 0xAA;
+			memcpy((char *)outbuf+512, (char *)&hdr1, sizeof(struct gpthdr));
+			memcpy((char *)outbuf+1024, (char *)gpttable, sizeof(gpttable));
+			if (write_data(drive, 0, 512, outbuf, 34) < 0) {
+				cout << "Failed to write primary GPT!" << endl;
+				return EXIT_FAILURE;
+			}
+		} else {
+			memcpy((char *)outbuf, (char *)&hdr1, sizeof(struct gpthdr));
+			memcpy((char *)outbuf+512, (char *)gpttable, sizeof(gpttable));
+			if (write_data(drive, 1, 512, outbuf, 33) < 0) {
+				cout << "Failed to write primary GPT!" << endl;
+				return EXIT_FAILURE;
+			}
 		}
 		
 		cout << "Writing secondary GPT to LBA address " << disk_len-33 << "..." << endl;
@@ -853,14 +868,19 @@ int main(int argc, char *argv[])
 		}
 		cout << "Success!" << endl;
 	} else {
-		cout << "Writing primary GPT and protective MBR to primary.img..." << endl;
+		cout << "Writing primary GPT ";
+		if (!keepmbr) cout << "and protective MBR ";
+		cout << "to primary.img..." << endl;
+		
 		fout.open("primary.img", ios_base::binary);
-		for (int i = 0; i < 446; i++)
-			fout << '\0';
-		fout.write((char *)&prot_mbr, sizeof(struct mbrpart));
-		for (int i = 0; i < 48; i++)
-			fout << '\0';
-		fout << (char)0x55 << (char)0xAA;
+		if (!keepmbr) {
+			for (int i = 0; i < 446; i++)
+				fout << '\0';
+			fout.write((char *)&prot_mbr, sizeof(struct mbrpart));
+			for (int i = 0; i < 48; i++)
+				fout << '\0';
+			fout << (char)0x55 << (char)0xAA;
+		}
 		fout.write((char *)&hdr1, sizeof(struct gpthdr));
 		fout.write((char *)gpttable, sizeof(gpttable));
 		fout.close();
@@ -872,9 +892,9 @@ int main(int argc, char *argv[])
 		fout.close();
 
 		cout << "Success!" << endl;
-		cout << "Write primary.img to LBA address 0." << endl;
+		cout << "Write primary.img to LBA address " << (keepmbr ? "1." : "0.") << endl;
 		cout << "Write secondary.img to LBA address " << disk_len-33 << "." << endl;
 	}
-	
+	system("PAUSE");
     return EXIT_SUCCESS;
 }
