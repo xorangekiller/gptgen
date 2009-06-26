@@ -1015,6 +1015,5 @@ int main(int argc, char *argv[])
 		cout << "Write secondary.img to LBA address " << disk_len-(table_len+1) << "." << endl;
 	}
 	free(gpttable);
-	system("PAUSE");
     return EXIT_SUCCESS;
 }
