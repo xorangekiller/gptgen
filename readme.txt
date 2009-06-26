@@ -65,21 +65,21 @@ reuse this code for that purpose.)
 * Endianness is not auto-detected, you need to uncomment the line
   "#define WE_ARE_BIG_ENDIAN 1" in gptgen.cpp to compile on big-endian
   platforms. Big-endian support is also completely untested.
-* Gptgen doesn't yet support drives with a block size other than 512
-  bytes. This may change in the future. All calculations below assume
-  a block size of 512 bytes.
 * The GUID partition table requires that no partition can begin before
-  logical block 34 (number of GPT entries/4 + 2 - gptgen uses 128
-  entries), and that there must be at least 33 (entry count / 4 + 1)
-  free blocks at the end of the drive before conversion. The first
-  requirement is usually not a problem, since MBR partitions begin in
-  the second "track" of the drive (in the BIOS-supplied fake geometry,
-  not related to the true geometry in modern drives), and a "track"
-  is usually 63 sectors long, making the first partition begin in block
-  63; however the second limitation might require the last partition of
-  the disk to be shrunk by a cylinder to make way for the backup GPT at
-  the end of the disk. Gptgen will warn and stop if the drive doesn't
-  meet these requirements.
+  logical block 34 (number of GPT entries*128/block size + 2 - gptgen
+  defaults to 128 entries), and that there must be at least 33
+  (entry count*128/block size + 1) free blocks at the end of the drive
+  before conversion. The first requirement is usually not a problem,
+  since MBR partitions begin in the second "track" of the drive (in the
+  BIOS-supplied fake geometry, not related to the true geometry in
+  modern drives), and a "track" is usually 63 sectors long, making the
+  first partition begin in block 63; however the second limitation
+  might require the last partition of the disk to be shrunk by a cylin-
+  der to make way for the backup GPT at the end of the disk. Gptgen
+  will warn and stop if the drive doesn't  meet these requirements.
+  (The actual needed sector numbers can vary with the chosen entry
+  count and the drive's block size, "34" and "33" are based on a
+  drive block size of 512 bytes and an entry count of 128.)
 
 4. Usage
 
@@ -100,3 +100,6 @@ ting MBR on the disk, instead of writing a protective MBR. This is not
 recommended, and may prevent recognition of the drive as GPT on some
 systems, but it is useful when you want to be extra safe, and verify
 the newly-written GPT before wiping out the MBR.
+Gptgen, by default, builds a GPT consisting of 128 partition entries.
+You can override this using the -c (--count) parameter, e.g.
+"gptgen -w -c 32 \\.\physicaldriveX".

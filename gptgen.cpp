@@ -22,6 +22,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <cmath>
 
 #define WE_ARE_WINDOWS 1 // comment this line out on Linux
 //#define WE_ARE_BIG_ENDIAN 1 // uncomment this line on big-endian platforms
@@ -183,7 +184,6 @@ struct gpthdr {
 	uint32_t entry_cnt;
 	uint32_t entry_len;
 	uint32_t part_sum;
-	unsigned char padding[420]; // XXX 420 shouldn't be hardcoded!	
 }__attribute__((packed));
 
 vector<struct part> parts;
@@ -334,6 +334,32 @@ int write_data(string drive, uint64_t lba, int block_size, char *buf, int len)
 }
 
 /******************************************************************************\
+* get_block_size: return the block size of a drive in bytes, or 0 on error     *
+* drive: filename of the device (e.g. \\.\physicaldrive0)                      *
+\******************************************************************************/
+int get_block_size(string drive)
+{
+	HANDLE fin;
+	DWORD writelen;
+	DISK_GEOMETRY geom;
+	
+	fin = CreateFile(drive.c_str(), GENERIC_READ,
+					 FILE_SHARE_READ|FILE_SHARE_WRITE,
+					 NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	if (fin == INVALID_HANDLE_VALUE) {
+		CloseHandle(fin);
+		return 0;
+	}
+	
+	DeviceIoControl(fin, IOCTL_DISK_GET_DRIVE_GEOMETRY, NULL, 0, &geom,
+					sizeof(DISK_GEOMETRY), &writelen, NULL);
+	CloseHandle(fin);
+	
+	return geom.BytesPerSector;
+}
+
+/******************************************************************************\
 * get_capacity: return the capacity of a drive in bytes, or 0 on error         *
 * drive: filename of the device (e.g. \\.\physicaldrive0)                      *
 \******************************************************************************/
@@ -357,7 +383,7 @@ uint64_t get_capacity(string drive)
 	CloseHandle(fin);
 	
 	return capacity.Length.QuadPart;
-}		
+}
 #else
 /******************************************************************************\
 * read_block: read a logical block of data from a device                       *
@@ -400,7 +426,6 @@ int write_data(string drive, uint64_t lba, int block_size, char *buf, int len)
 	return 0;
 }
 
-
 /******************************************************************************\
 * get_capacity: return the capacity of a drive in bytes, or 0 on error         *
 * drive: filename of the device (e.g. /dev/hda or /dev/sda)                    *
@@ -417,10 +442,38 @@ uint64_t get_capacity(string drive)
 		return 0;
 	
 #ifdef BLKGETSIZE64
-	ioctl(fin, BLKGETSIZE64, &ret);
+	if (ioctl(fin, BLKGETSIZE64, &ret)) {
+		close(fin);	
+		return 0;
+	}
 #else
-	ioctl(fin, BLKGETSIZE, &numblocks);
+	if (ioctl(fin, BLKGETSIZE, &ret)) {
+		close(fin);	
+		return 0;
+	}
+	ret *= 512;
 #endif
+	close(fin);
+	
+	return ret;
+}
+
+/******************************************************************************\
+* get_block_size: return the block size of a drive in bytes, or 0 on error     *
+* drive: filename of the device (e.g. /dev/hda or /dev/sda)                    *
+\******************************************************************************/
+int get_block_size(string drive)
+{
+	int ret = 0;
+	int fin = open(drive.c_str(), O_RDONLY);
+	if (!fin)
+		return 0;
+	
+	// XXX BLKBSZGET or BLKSSZGET?
+	if ioctl(fin, BLKBSZGET, &ret) {
+		close(fin)	
+		return 0;
+	};
 	close(fin);
 	
 	return ret;
@@ -517,9 +570,10 @@ void usage(char *name)
 	cout << "where device_path is the full path to the device file," << endl;
 	cout << "e.g. /dev/hda or \\\\.\\physicaldrive0." << endl;
 	cout << "Available arguments (no \"-wm\"-style argument combining support):" << endl;
-	cout << "-w, --write: write directly to the disk, not to separate files" << endl;
-	cout << "-m, --keepmbr: keep the existing MBR, don't write a protective MBR" << endl;
+	cout << "-c nnn, --count nnn: build a GPT containing nnn entries (default=128)" << endl;
 	cout << "-h, --help, --usage: display this help message" << endl;
+	cout << "-m, --keepmbr: keep the existing MBR, don't write a protective MBR" << endl;
+	cout << "-w, --write: write directly to the disk, not to separate files" << endl;
 	return;
 }
 
@@ -532,15 +586,16 @@ int main(int argc, char *argv[])
 	char buf[8];
 	struct mbrpart curr[4];
 	vector<struct gptpart> gptparts;
-	struct gptpart gpttable[128]; // XXX shouldn't hardcode 128 here!
+	struct gptpart *gpttable;
 	string drive;
 	uint64_t disk_len;
 	uint32_t first_ebr = 0, curr_ebr = 0;
 	bool write = false, badlayout = false, boot = false, keepmbr = false;
+	int table_len, record_count = 128, block_size = 0;
 
 	memset((void *)curr, 0, 64);
 	
-	cout << argv[0] << "Partition table converter "
+	cout << argv[0] << ": Partition table converter "
 		 << "v0.2pre" << endl;
 	cout << endl;
 	
@@ -554,6 +609,9 @@ int main(int argc, char *argv[])
 				   !strcmp(argv[i], "--usage")) {
 			usage(argv[0]);
 			return EXIT_SUCCESS;
+		} else if (!strcmp(argv[i], "-c") || !strcmp(argv[i], "--count")) {
+			i++;
+			record_count = atoi(argv[i]);
 		} else if (argv[i][0] == '-') {
 			usage(argv[0]);
 			cout << argv[0] << ": Invalid argument: " << argv[i] << "." << endl;
@@ -579,9 +637,17 @@ int main(int argc, char *argv[])
 		cout << argv[0] << ": No drive specified." << endl;
 		return EXIT_FAILURE;
 	}
+
+	block_size = get_block_size(drive);
+	if (!block_size) {
+		cout << "Unable to auto-determine the block size of the disk." << endl;
+		cout << "Please enter the the block size by hand to continue." << endl
+			 << ">";
+		cin >> block_size;
+	}
 	
 	// read and parse the MBR
-	if (read_tbl(drive, curr_ebr, 512, (char *)curr) < 0) {
+	if (read_tbl(drive, curr_ebr, block_size, (char *)curr) < 0) {
 		cout << "Block read failed, check permissions!" << endl;
 		return EXIT_FAILURE;
 	}
@@ -590,35 +656,36 @@ int main(int argc, char *argv[])
 	
 	// read and parse the EBR chain, if present
 	while (curr_ebr > 0) {
-		if (read_tbl(drive, curr_ebr, 512, (char *)curr) < 0) {
+		if (read_tbl(drive, curr_ebr, block_size, (char *)curr) < 0) {
 			cout << "Block read failed, check permissions!" << endl;
 			return EXIT_FAILURE;
 		}
 		curr_ebr = parse_tbl(curr, curr_ebr, first_ebr);
 	};
 	
-	disk_len = get_capacity(drive)/512; //XXX Block size is not necessarily 512!
-	
+	disk_len = get_capacity(drive)/block_size;
 	if (!disk_len) {
 		cout << "Unable to auto-determine the capacity of the disk." << endl;
-		cout << "Please enter the LBA capacity by hand to continue. " << endl
+		cout << "Please enter the LBA capacity by hand to continue." << endl
 			 << ">";
 		cin >> disk_len;
 	}
+
+	table_len = (int)ceil((double)(record_count * sizeof(gptpart)) / (double)block_size);
 	
-	if (parts.size() && parts[0].start < 34) {
+	if (parts.size() && parts[0].start < table_len+2) {
 		cout << "Not enough space at the beginning of the disk (need at least"
-			 << endl << "34 sectors before the start of the first partition)."
+			 << endl << table_len+2 << " sectors before the start of the first partition)."
 			 << endl << "Re-partition the disk to meet this requirement, and"
 			 << "run this utility again." << endl;
 		badlayout = true;
 	}
 	
 	if (parts.size() &&
-		parts[parts.size()-1].start + parts[parts.size()-1].len > disk_len-34) {
+		parts[parts.size()-1].start + parts[parts.size()-1].len > disk_len - (table_len+2)) {
 		if (badlayout) cout << endl;
 		cout << "Not enough space at the end of the disk (need at least"
-			 << endl << "34 sectors after the end of the last partition)."
+			 << endl << table_len+1 << " sectors after the end of the last partition)."
 			 << endl << "Re-partition the disk to meet this requirement, and"
 			 << "run this utility again." << endl;
 		badlayout = true;
@@ -793,14 +860,15 @@ int main(int argc, char *argv[])
 			 
 	cout << endl;
 	
+	gpttable = (struct gptpart *)calloc(record_count, sizeof(gptpart));
 	/* Generate a complete partition array */
 	for (int i = 0; i < parts.size(); i++)
 		gpttable[i] = gptparts[i];
-	for (int i = parts.size(); i < 128; i++)
+	for (int i = parts.size(); i < record_count; i++)
 		gpttable[i] = empty_record;
 	
 	int table_crc = crc32((unsigned char *)gpttable,
-						  sizeof(gptpart) * 128);
+						  sizeof(gptpart) * record_count);
 	
 	struct gpthdr hdr1 = {
 		GPT_MAGIC,
@@ -810,12 +878,12 @@ int main(int argc, char *argv[])
 		0,
 		cpu_to_le64(1ULL),
 		cpu_to_le64(disk_len-1),
-		cpu_to_le64(34ULL),
-		cpu_to_le64(disk_len-34),
+		cpu_to_le64(table_len+2ULL),
+		cpu_to_le64(disk_len-(table_len+2)),
 		NULL_GUID,
 		cpu_to_le64(2ULL),
-		cpu_to_le32(128), // total number of records, not only used ones
-		cpu_to_le32(128),
+		cpu_to_le32(record_count),
+		cpu_to_le32(sizeof(gptpart)),
 		table_crc,
 	};
 	
@@ -827,17 +895,14 @@ int main(int argc, char *argv[])
 		0,
 		cpu_to_le64(disk_len-1),
 		cpu_to_le64(1ULL),
-		cpu_to_le32(34ULL),
-		cpu_to_le64(disk_len-34),
+		cpu_to_le32(table_len+2ULL),
+		cpu_to_le64(disk_len-(table_len+2)),
 		NULL_GUID,
-		cpu_to_le64(disk_len-33),
-		cpu_to_le32(128), // total number of records, not only used ones
-		cpu_to_le32(128),
+		cpu_to_le64(disk_len-(table_len+1)),
+		cpu_to_le32(record_count),
+		cpu_to_le32(sizeof(gptpart)),
 		table_crc,
 	};
-	
-	memset((void *)hdr1.padding, 0, 420);
-	memset((void *)hdr2.padding, 0, 420);
 	
 	hdr1.hdrsum = cpu_to_le32(crc32((unsigned char *)&hdr1, 92));
 	hdr2.hdrsum = cpu_to_le32(crc32((unsigned char *)&hdr2, 92));
@@ -860,42 +925,53 @@ int main(int argc, char *argv[])
 		if (!keepmbr) cout << "and protective MBR ";
 		cout << "to LBA address " << (keepmbr ? "1" : "0") << "..." << endl;
 		
-		char outbuf[20000];
-		
-		memset((char *)outbuf, 0, 20000);
+		char *outbuf = (char *)malloc(block_size*(table_len+2));
+		memset((char *)outbuf, 0, block_size*(table_len+2));
 		
 		if (!keepmbr) {
 			// grab the MBR loader code and put it into the protective MBR
-			if (read_mbr(drive, 0, 512, outbuf) < 0) {
+			if (read_mbr(drive, 0, block_size, outbuf) < 0) {
 				cout << "Block read failed!" << endl;
+				free(gpttable);
+				free(outbuf);
 				return EXIT_FAILURE;
 			}
 			memcpy((char *)outbuf+446, (char *)&prot_mbr, sizeof(struct mbrpart));
 			outbuf[510] = 0x55;
 			outbuf[511] = 0xAA;
-			memcpy((char *)outbuf+512, (char *)&hdr1, sizeof(struct gpthdr));
-			memcpy((char *)outbuf+1024, (char *)gpttable, sizeof(gpttable));
-			if (write_data(drive, 0, 512, outbuf, 34) < 0) {
+			memcpy((char *)outbuf+block_size, (char *)&hdr1, sizeof(struct gpthdr));
+			memset((char *)outbuf+block_size+92, 0, block_size-92);
+			memcpy((char *)outbuf+(block_size*2), (char *)gpttable, record_count*sizeof(gptpart));
+			if (write_data(drive, 0, block_size, outbuf, table_len+2) < 0) {
 				cout << "Failed to write primary GPT!" << endl;
+				free(gpttable);
+				free(outbuf);
 				return EXIT_FAILURE;
 			}
 		} else {
 			memcpy((char *)outbuf, (char *)&hdr1, sizeof(struct gpthdr));
-			memcpy((char *)outbuf+512, (char *)gpttable, sizeof(gpttable));
-			if (write_data(drive, 1, 512, outbuf, 33) < 0) {
+			memset((char *)outbuf+92, 0, block_size-92);
+			memcpy((char *)outbuf+block_size, (char *)gpttable, record_count*sizeof(gptpart));
+			if (write_data(drive, 1, block_size, outbuf, table_len+1) < 0) {
 				cout << "Failed to write primary GPT!" << endl;
+				free(gpttable);
+				free(outbuf);
 				return EXIT_FAILURE;
 			}
 		}
 		
-		cout << "Writing secondary GPT to LBA address " << disk_len-33 << "..." << endl;
-		memset((char *)outbuf, 0, 20000);
-		memcpy((char *)outbuf, (char *)gpttable, sizeof(gpttable));
-		memcpy((char *)outbuf+sizeof(gpttable), (char *)&hdr1, sizeof(struct gpthdr));
-		if (write_data(drive, disk_len-33, 512, (char *)outbuf, 33) < 0) {
+		cout << "Writing secondary GPT to LBA address " << disk_len-(table_len+1) << "..." << endl;
+		memset((char *)outbuf, 0, block_size*(table_len+2));
+		memcpy((char *)outbuf, (char *)gpttable, record_count*sizeof(gptpart));
+		memcpy((char *)outbuf+record_count*sizeof(gptpart), (char *)&hdr1, sizeof(struct gpthdr));
+		memset((char *)outbuf+record_count*sizeof(gptpart)+92, 0, block_size-92);
+		if (write_data(drive, disk_len-(table_len+1), block_size, (char *)outbuf, table_len+1) < 0) {
 			cout << "Failed to write secondary GPT!" << endl;
+			free(gpttable);
+			free(outbuf);
 			return EXIT_FAILURE;
 		}
+		free(outbuf);
 		cout << "Success!" << endl;
 	} else {
 		cout << "Writing primary GPT ";
@@ -907,8 +983,9 @@ int main(int argc, char *argv[])
 			char mbrbuf[446];
 			
 			// grab the MBR loader code and put it into the protective MBR
-			if (read_mbr(drive, 0, 512, mbrbuf) < 0) {
+			if (read_mbr(drive, 0, block_size, mbrbuf) < 0) {
 				cout << "Block read failed!" << endl;
+				free(gpttable);
 				return EXIT_FAILURE;
 			}
 			fout.write(mbrbuf, 446);
@@ -916,21 +993,29 @@ int main(int argc, char *argv[])
 			for (int i = 0; i < 48; i++)
 				fout << '\0';
 			fout << (char)0x55 << (char)0xAA;
+			for (int i = 512; i < block_size; i++)
+				fout << '\0';
 		}
 		fout.write((char *)&hdr1, sizeof(struct gpthdr));
-		fout.write((char *)gpttable, sizeof(gpttable));
+		for (int i = 92; i < block_size; i++)
+			fout << '\0';
+		fout.write((char *)gpttable, record_count*sizeof(gptpart));
+		fout.flush();
 		fout.close();
 
 		cout << "Writing secondary GPT to secondary.img..." << endl;
 		fout.open("secondary.img", ios_base::binary);
-		fout.write((char *)gpttable, sizeof(gpttable));
+		fout.write((char *)gpttable, record_count*sizeof(gptpart));
 		fout.write((char *)&hdr2, sizeof(struct gpthdr));
+		for (int i = 92; i < block_size; i++)
+			fout << '\0';
 		fout.close();
 
 		cout << "Success!" << endl;
 		cout << "Write primary.img to LBA address " << (keepmbr ? "1." : "0.") << endl;
-		cout << "Write secondary.img to LBA address " << disk_len-33 << "." << endl;
+		cout << "Write secondary.img to LBA address " << disk_len-(table_len+1) << "." << endl;
 	}
+	free(gpttable);
 	system("PAUSE");
     return EXIT_SUCCESS;
 }
