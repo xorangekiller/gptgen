@@ -1000,7 +1000,6 @@ int main(int argc, char *argv[])
 		for (int i = 92; i < block_size; i++)
 			fout << '\0';
 		fout.write((char *)gpttable, record_count*sizeof(gptpart));
-		fout.flush();
 		fout.close();
 
 		cout << "Writing secondary GPT to secondary.img..." << endl;
