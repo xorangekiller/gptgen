@@ -423,7 +423,7 @@ int write_data(string drive, uint64_t lba, int block_size, char *buf, int len)
 	if (!fout)
 		return -1;
 	fout.seekp((lba*block_size));
-	fout.write(buf, len);
+	fout.write(buf, len*block_size);
 	fout.close();
 	return 0;
 }
