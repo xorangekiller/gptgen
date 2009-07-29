@@ -3,7 +3,7 @@
 * Utility for converting MBR/MSDOS-partitioned disk drives                     *
 * to GUID Partition Table.                                                     *
 *                                                                              *
-* Copyright (c) 2009, Gábor A. Stefanik <netrolller.3d@gmail.com>              *
+* Copyright (c) 2009, Gï¿½bor A. Stefanik <netrolller.3d@gmail.com>              *
 *                                                                              *
 * Permission to use, copy, modify, and/or distribute this software for any     *
 * purpose with or without fee is hereby granted, provided that the above       *
@@ -18,13 +18,16 @@
 * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.               *
 \******************************************************************************/
 
-#include <cstdlib>
-#include <iostream>
-#include <fstream>
-#include <vector>
+#include <algorithm>
+#include <cerrno>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <vector>
 
-#define WE_ARE_WINDOWS 1 // comment this line out on Linux
+//#define WE_ARE_WINDOWS 1 // comment this line out on Linux
 //#define WE_ARE_BIG_ENDIAN 1 // uncomment this line on big-endian platforms
 
 #ifdef WE_ARE_WINDOWS
@@ -249,15 +252,14 @@ static uint32_t crc32_tbl[256] = {
 * buf: buffer holding the data to be CRCed                                     *
 * len: length of the data                                                      *
 \******************************************************************************/
-uint32_t crc32(const unsigned char *buf, unsigned long len)
+uint32_t crc32(const unsigned char *buf, int len)
 {
 	uint32_t crc32val;
 	
 	crc32val = ~0L;
 	for (int i = 0; i < len; i++)
 		crc32val = crc32_tbl[(crc32val ^ buf[i]) & 0xff] ^ (crc32val >> 8);
-	crc32val ^= ~0L;
-	return crc32val;
+	return ~crc32val;
 }
 
 /******************************************************************************\
@@ -400,7 +402,7 @@ int read_block(string drive, uint64_t lba, int block_size, char *buf)
 	if (!fin)
 		return -1;
 	fin.seekg(lba*block_size);
-	fin.read(tmpbuf, block_size);
+	fin.read(buf, block_size);
 	fin.close();
 	return 0;
 }
@@ -466,14 +468,13 @@ int get_block_size(string drive)
 {
 	int ret = 0;
 	int fin = open(drive.c_str(), O_RDONLY);
-	if (!fin)
+	if (fin == -1)
 		return 0;
 	
-	// XXX BLKBSZGET or BLKSSZGET?
-	if ioctl(fin, BLKBSZGET, &ret) {
-		close(fin)	
+	if (ioctl(fin, BLKSSZGET, &ret) < 0) {
+		close(fin);
 		return 0;
-	};
+	}
 	close(fin);
 	
 	return ret;
@@ -583,7 +584,6 @@ void usage(char *name)
 int main(int argc, char *argv[])
 {
 	ofstream fout;
-	char buf[8];
 	struct mbrpart curr[4];
 	vector<struct gptpart> gptparts;
 	struct gptpart *gpttable;
@@ -591,7 +591,7 @@ int main(int argc, char *argv[])
 	uint64_t disk_len;
 	uint32_t first_ebr = 0, curr_ebr = 0;
 	bool write = false, badlayout = false, boot = false, keepmbr = false;
-	int table_len, record_count = 128, block_size = 0;
+	unsigned int table_len = 0, record_count = 128, block_size = 0;
 
 	memset((void *)curr, 0, 64);
 	
@@ -696,7 +696,7 @@ int main(int argc, char *argv[])
 	
 	sort(parts.begin(), parts.end(), cmp);
 	
-	for (int i = 0; i < parts.size(); i++) {
+	for (unsigned int i = 0; i < parts.size(); i++) {
 		struct gptpart gptout;
 		
 		cout << "Boot: " << parts[i].active << ", Type: 0x" 
@@ -836,7 +836,6 @@ int main(int argc, char *argv[])
 			cout << "WARNING: Unknown partition type in record " << i
 			<< " (" << hex << (int)parts[i].type << dec << ")." << endl;
 			cout << "A generic GUID will be used." << endl;
-		fallback:
 			{
 				__guid gtmp = MBR2GUID(parts[i].type);
 				gptout.type = gtmp;
@@ -862,9 +861,9 @@ int main(int argc, char *argv[])
 	
 	gpttable = (struct gptpart *)calloc(record_count, sizeof(gptpart));
 	/* Generate a complete partition array */
-	for (int i = 0; i < parts.size(); i++)
+	for (unsigned int i = 0; i < parts.size(); i++)
 		gpttable[i] = gptparts[i];
-	for (int i = parts.size(); i < record_count; i++)
+	for (unsigned int i = parts.size(); i < record_count; i++)
 		gpttable[i] = empty_record;
 	
 	int table_crc = crc32((unsigned char *)gpttable,
@@ -993,11 +992,11 @@ int main(int argc, char *argv[])
 			for (int i = 0; i < 48; i++)
 				fout << '\0';
 			fout << (char)0x55 << (char)0xAA;
-			for (int i = 512; i < block_size; i++)
+			for (unsigned int i = 512; i < block_size; i++)
 				fout << '\0';
 		}
 		fout.write((char *)&hdr1, sizeof(struct gpthdr));
-		for (int i = 92; i < block_size; i++)
+		for (unsigned int i = 92; i < block_size; i++)
 			fout << '\0';
 		fout.write((char *)gpttable, record_count*sizeof(gptpart));
 		fout.close();
@@ -1006,7 +1005,7 @@ int main(int argc, char *argv[])
 		fout.open("secondary.img", ios_base::binary);
 		fout.write((char *)gpttable, record_count*sizeof(gptpart));
 		fout.write((char *)&hdr2, sizeof(struct gpthdr));
-		for (int i = 92; i < block_size; i++)
+		for (unsigned int i = 92; i < block_size; i++)
 			fout << '\0';
 		fout.close();
 
