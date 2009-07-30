@@ -74,7 +74,15 @@ reuse this code for that purpose.)
   (The actual needed sector numbers can vary with the chosen entry
   count and the drive's block size, "34" and "33" are based on a
   drive block size of 512 bytes and an entry count of 128.)
-* 
+* Some implementations of GPT (e.g. Windows) require certain partions
+  to be present on the disk (e.g. an EFI boot partition). Gptgen
+  doesn't create these partitions, it can only convert the existing
+  partition table's contents. To create such partitions, use a
+  GPT-ready partition manager such as parted.
+* Because booting is handled differently with GPT than with MBR, con-
+  verting a boot drive to GPT may render it unbootable. To make a GPT
+  drive bootable on BIOS, you will need to create a BIOS boot partition
+  and install a GPT-aware boot loader (such as Grub 2 SVN) on it.
 
 4. Usage
 
