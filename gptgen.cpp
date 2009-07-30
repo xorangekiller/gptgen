@@ -1,9 +1,9 @@
 /******************************************************************************\
-* gptgen version 0.2pre                                                        *
+* gptgen version 0.99                                                          *
 * Utility for converting MBR/MSDOS-partitioned disk drives                     *
 * to GUID Partition Table.                                                     *
 *                                                                              *
-* Copyright (c) 2009, G�bor A. Stefanik <netrolller.3d@gmail.com>              *
+* Copyright (c) 2009, Gabor A. Stefanik <netrolller.3d@gmail.com>              *
 *                                                                              *
 * Permission to use, copy, modify, and/or distribute this software for any     *
 * purpose with or without fee is hereby granted, provided that the above       *
@@ -27,9 +27,6 @@
 #include <iostream>
 #include <vector>
 
-//#define WE_ARE_WINDOWS 1 // comment this line out on Linux
-//#define WE_ARE_BIG_ENDIAN 1 // uncomment this line on big-endian platforms
-
 #ifdef WE_ARE_WINDOWS
 #include <windows.h>
 #include <winioctl.h>
@@ -51,48 +48,86 @@ using namespace std;
 
 typedef uint64_t __be64;
 
-#define	swap16(x) (((x)<<8)|((x)>>8))
-#define swap32(x) (((x)<<24) | \
-	(((x)<<8)  & 0x00FF0000) |\
-	(((x)>>8)  & 0x0000FF00) |\
-	((x)>>24))
-#define swap64(x) (((x)<<56) | \
-	(((x)<<40) & 0x00FF000000000000ULL) |\
-	(((x)<<24) & 0x0000FF0000000000ULL) |\
-	(((x)<<8)  & 0x000000FF00000000ULL) |\
-	(((x)>>8)  & 0x00000000FF000000ULL) |\
-	(((x)>>24) & 0x0000000000FF0000ULL) |\
-	(((x)>>40) & 0x000000000000FF00ULL) |\
-	((x)>>56))
+/******************************************************************************\
+* swapXX, keepXX, cpu_to_XeXX: endianness helper functions/pointers            *
+\******************************************************************************/
 
-// TODO endianness auto-detection
-#ifdef WE_ARE_BIG_ENDIAN
-#define	cpu_to_be16(x) (x)
-#define be16_to_cpu(x) (x)
-#define	cpu_to_be32(x) (x)
-#define be32_to_cpu(x) (x)
-#define	cpu_to_be64(x) (x)
-#define be64_to_cpu(x) (x)
-#define	cpu_to_le16(x) swap16(x)
-#define le16_to_cpu(x) swap16(x)
-#define cpu_to_le32(x) swap32(x)
-#define le32_to_cpu(x) swap32(x)
-#define cpu_to_le64(x) swap64(x)
-#define le64_to_cpu(x) swap64(x)
-#else
-#define	cpu_to_le16(x) (x)
-#define le16_to_cpu(x) (x)
-#define	cpu_to_le32(x) (x)
-#define le32_to_cpu(x) (x)
-#define	cpu_to_le64(x) (x)
-#define le64_to_cpu(x) (x)
-#define	cpu_to_be16(x) swap16(x)
-#define be16_to_cpu(x) swap16(x)
-#define cpu_to_be32(x) swap32(x)
-#define be32_to_cpu(x) swap32(x)
-#define cpu_to_be64(x) swap64(x)
-#define be64_to_cpu(x) swap64(x)
-#endif
+inline uint16_t swap16(uint16_t x)
+{
+	return ((x)<<8)|((x)>>8);
+}
+
+inline uint16_t keep16(uint16_t x)
+{
+	return x;
+}
+
+inline uint32_t swap32(uint32_t x)
+{
+	return (x<<24) |
+		   ((x<<8) & 0x00FF0000) |
+		   ((x>>8) & 0x0000FF00) |
+		   (x>>24);
+}
+
+uint32_t keep32(uint32_t x)
+{
+	return x;
+}
+
+uint64_t swap64(uint64_t x)
+{
+	return (x<<56) |
+		   ((x<<40) & 0x00FF000000000000ULL) |
+		   ((x<<24) & 0x0000FF0000000000ULL) |
+		   ((x<<8)  & 0x000000FF00000000ULL) |
+		   ((x>>8)  & 0x00000000FF000000ULL) |
+		   ((x>>24) & 0x0000000000FF0000ULL) |
+		   ((x>>40) & 0x000000000000FF00ULL) |
+		   (x>>56);
+}
+
+uint64_t keep64(uint64_t x)
+{
+	return x;
+}
+
+uint16_t (*cpu_to_be16) (uint16_t x);
+uint32_t (*cpu_to_be32) (uint32_t x);
+uint64_t (*cpu_to_be64) (uint64_t x);
+uint16_t (*cpu_to_le16) (uint16_t x);
+uint32_t (*cpu_to_le32) (uint32_t x);
+uint64_t (*cpu_to_le64) (uint64_t x);
+
+#define be16_to_cpu cpu_to_be16
+#define be32_to_cpu cpu_to_be32
+#define be64_to_cpu cpu_to_be64
+#define le16_to_cpu cpu_to_le16
+#define le32_to_cpu cpu_to_le32
+#define le64_to_cpu cpu_to_le64
+
+/******************************************************************************\
+* setup_endian: set up the endianness helper mapping for the running system    *
+\******************************************************************************/
+void setup_endian() {
+	unsigned char test[2] = {0x00, 0xFF};
+	
+	if (*(uint16_t *)test == 0xFF00) { // little endian
+		cpu_to_be16 = swap16;
+		cpu_to_be32 = swap32;
+		cpu_to_be64 = swap64;
+		cpu_to_le16 = keep16;
+		cpu_to_le32 = keep32;
+		cpu_to_le64 = keep64;
+	} else { // big endian
+		cpu_to_be16 = keep16;
+		cpu_to_be32 = keep32;
+		cpu_to_be64 = keep64;
+		cpu_to_le16 = swap16;
+		cpu_to_le32 = swap32;
+		cpu_to_le64 = swap64;
+	}
+}
 
 struct __guid {
 	uint32_t data1;
@@ -567,14 +602,24 @@ uint32_t parse_tbl(struct mbrpart *curr,
 \******************************************************************************/
 void usage(char *name)
 {
-	cout << "Usage: " << name << "[<arguments>] <device_path>" << endl;
+	cout << "Usage: " << name << " [<arguments>] <device_path>" << endl;
 	cout << "where device_path is the full path to the device file," << endl;
-	cout << "e.g. /dev/hda or \\\\.\\physicaldrive0." << endl;
-	cout << "Available arguments (no \"-wm\"-style argument combining support):" << endl;
-	cout << "-c nnn, --count nnn: build a GPT containing nnn entries (default=128)" << endl;
+	cout << "e.g."
+#ifdef WE_ARE_WINDOWS
+		 << "\\\\.\\physicaldrive0."
+#else
+		 << "/dev/hda or /dev/sda."
+#endif
+		 << endl;
+	cout << "Available arguments (no \"-wm\"-style "
+		 << "argument combining support):" << endl;
+	cout << "-c nnn, --count nnn: build a "
+		 << "GPT containing nnn entries (default=128)" << endl;
 	cout << "-h, --help, --usage: display this help message" << endl;
-	cout << "-m, --keepmbr: keep the existing MBR, don't write a protective MBR" << endl;
-	cout << "-w, --write: write directly to the disk, not to separate files" << endl;
+	cout << "-m, --keepmbr: keep the existing MBR, "
+		 << "don't write a protective MBR" << endl;
+	cout << "-w, --write: write directly to the disk, "
+		 << "not to separate files" << endl;
 	return;
 }
 
@@ -593,10 +638,12 @@ int main(int argc, char *argv[])
 	bool write = false, badlayout = false, boot = false, keepmbr = false;
 	unsigned int table_len = 0, record_count = 128, block_size = 0;
 
+	setup_endian();
+
 	memset((void *)curr, 0, 64);
 	
 	cout << argv[0] << ": Partition table converter "
-		 << "v0.2pre" << endl;
+		 << "v0.99" << endl;
 	cout << endl;
 	
 	// XXX The command-line parsing code has room for improvements...
@@ -621,7 +668,8 @@ int main(int argc, char *argv[])
 				drive = argv[i];
 			} else {
 				usage(argv[0]);
-				cout << argv[0] << ": Too many arguments (" << argc << ")." << endl;
+				cout << argv[0] << ": Too many arguments ("
+					 << argc << ")." << endl;
 				return EXIT_FAILURE;
 			}
 		}
@@ -671,22 +719,26 @@ int main(int argc, char *argv[])
 		cin >> disk_len;
 	}
 
-	table_len = (int)ceil((double)(record_count * sizeof(gptpart)) / (double)block_size);
+	table_len = (int)ceil((double)(record_count * sizeof(gptpart)) /
+						  (double)block_size);
 	
 	if (parts.size() && parts[0].start < table_len+2) {
 		cout << "Not enough space at the beginning of the disk (need at least"
-			 << endl << table_len+2 << " sectors before the start of the first partition)."
-			 << endl << "Re-partition the disk to meet this requirement, and"
+			 << table_len+2 << " sectors before" << endl
+			 << "the start of the first partition)."
+			 << endl << "Re-partition the disk to meet this requirement, and "
 			 << "run this utility again." << endl;
 		badlayout = true;
 	}
 	
 	if (parts.size() &&
-		parts[parts.size()-1].start + parts[parts.size()-1].len > disk_len - (table_len+2)) {
+		parts[parts.size()-1].start + parts[parts.size()-1].len >
+		disk_len - (table_len+2)) {
 		if (badlayout) cout << endl;
 		cout << "Not enough space at the end of the disk (need at least"
-			 << endl << table_len+1 << " sectors after the end of the last partition)."
-			 << endl << "Re-partition the disk to meet this requirement, and"
+			 << endl << table_len+1 << " sectors after"
+			 << "the end of the last partition)."
+			 << endl << "Re-partition the disk to meet this requirement, and "
 			 << "run this utility again." << endl;
 		badlayout = true;
 	}
@@ -740,13 +792,17 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 0x3C:
-			cout << "ERROR: PartitionMagic work partition (ID 0x3C) detected." << endl 
-				 << "This is a sign of an interrupted PartitionMagic session." << endl
+			cout << "ERROR: PartitionMagic work partition (ID 0x3C) detected."
+				 << endl
+				 << "This is a sign of an interrupted PartitionMagic session."
+				 << endl
 				 << "Correct this error, and run this utility again." << endl;
 			return EXIT_FAILURE;
 		case 0x42:
-			cout << "FATAL: Dynamic disk detected. Support for dynamic disks is" << endl
-				 << "not yet implemented. Writing a GPT to a dynamic disk is" << endl
+			cout << "FATAL: Dynamic disk detected. Support for dynamic disks is"
+				 << endl
+				 << "not yet implemented. Writing a GPT to a dynamic disk is"
+				 << endl
 				 << "dangerous. Operation aborted." << endl;
 			return EXIT_FAILURE;
 #if 0
@@ -823,8 +879,10 @@ int main(int argc, char *argv[])
 			}
 			break;
 		case 0xEE: // protective MBR
-			cout << "ERROR: This drive already has a GUID partition table." << endl 
-				 << "There is no need to run this utility on this drive again." << endl;
+			cout << "ERROR: This drive already has a GUID partition table."
+				 << endl
+				 << "There is no need to run this utility "
+				 << "on this drive again." << endl;
 			return EXIT_FAILURE;
 		case 0xEF:
 			{
@@ -935,12 +993,15 @@ int main(int argc, char *argv[])
 				free(outbuf);
 				return EXIT_FAILURE;
 			}
-			memcpy((char *)outbuf+446, (char *)&prot_mbr, sizeof(struct mbrpart));
+			memcpy((char *)outbuf+446, (char *)&prot_mbr,
+					sizeof(struct mbrpart));
 			outbuf[510] = 0x55;
 			outbuf[511] = 0xAA;
-			memcpy((char *)outbuf+block_size, (char *)&hdr1, sizeof(struct gpthdr));
+			memcpy((char *)outbuf+block_size, (char *)&hdr1,
+					sizeof(struct gpthdr));
 			memset((char *)outbuf+block_size+92, 0, block_size-92);
-			memcpy((char *)outbuf+(block_size*2), (char *)gpttable, record_count*sizeof(gptpart));
+			memcpy((char *)outbuf+(block_size*2), (char *)gpttable,
+					record_count*sizeof(gptpart));
 			if (write_data(drive, 0, block_size, outbuf, table_len+2) < 0) {
 				cout << "Failed to write primary GPT!" << endl;
 				free(gpttable);
@@ -950,7 +1011,8 @@ int main(int argc, char *argv[])
 		} else {
 			memcpy((char *)outbuf, (char *)&hdr1, sizeof(struct gpthdr));
 			memset((char *)outbuf+92, 0, block_size-92);
-			memcpy((char *)outbuf+block_size, (char *)gpttable, record_count*sizeof(gptpart));
+			memcpy((char *)outbuf+block_size, (char *)gpttable,
+					record_count*sizeof(gptpart));
 			if (write_data(drive, 1, block_size, outbuf, table_len+1) < 0) {
 				cout << "Failed to write primary GPT!" << endl;
 				free(gpttable);
@@ -959,12 +1021,16 @@ int main(int argc, char *argv[])
 			}
 		}
 		
-		cout << "Writing secondary GPT to LBA address " << disk_len-(table_len+1) << "..." << endl;
+		cout << "Writing secondary GPT to LBA address "
+			 << disk_len-(table_len+1) << "..." << endl;
 		memset((char *)outbuf, 0, block_size*(table_len+2));
 		memcpy((char *)outbuf, (char *)gpttable, record_count*sizeof(gptpart));
-		memcpy((char *)outbuf+record_count*sizeof(gptpart), (char *)&hdr1, sizeof(struct gpthdr));
-		memset((char *)outbuf+record_count*sizeof(gptpart)+92, 0, block_size-92);
-		if (write_data(drive, disk_len-(table_len+1), block_size, (char *)outbuf, table_len+1) < 0) {
+		memcpy((char *)outbuf+record_count*sizeof(gptpart), (char *)&hdr1,
+				sizeof(struct gpthdr));
+		memset((char *)outbuf+record_count*sizeof(gptpart)+92, 0,
+				block_size-92);
+		if (write_data(drive, disk_len-(table_len+1), block_size,
+				(char *)outbuf, table_len+1) < 0) {
 			cout << "Failed to write secondary GPT!" << endl;
 			free(gpttable);
 			free(outbuf);
@@ -1010,8 +1076,10 @@ int main(int argc, char *argv[])
 		fout.close();
 
 		cout << "Success!" << endl;
-		cout << "Write primary.img to LBA address " << (keepmbr ? "1." : "0.") << endl;
-		cout << "Write secondary.img to LBA address " << disk_len-(table_len+1) << "." << endl;
+		cout << "Write primary.img to LBA address "
+			 << (keepmbr ? "1." : "0.") << endl;
+		cout << "Write secondary.img to LBA address " << disk_len-(table_len+1)
+			 << "." << endl;
 	}
 	free(gpttable);
     return EXIT_SUCCESS;
