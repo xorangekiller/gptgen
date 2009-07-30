@@ -19,12 +19,12 @@
 \******************************************************************************/
 
 #include <algorithm>
-#include <cerrno>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <vector>
 
 #ifdef WE_ARE_WINDOWS
@@ -616,6 +616,8 @@ void usage(char *name)
 	cout << "-c nnn, --count nnn: build a "
 		 << "GPT containing nnn entries (default=128)" << endl;
 	cout << "-h, --help, --usage: display this help message" << endl;
+	cout << "-k, --keep-going: don't ask user if a "
+		 << "boot partition is found" << endl;
 	cout << "-m, --keepmbr: keep the existing MBR, "
 		 << "don't write a protective MBR" << endl;
 	cout << "-w, --write: write directly to the disk, "
@@ -632,10 +634,11 @@ int main(int argc, char *argv[])
 	struct mbrpart curr[4];
 	vector<struct gptpart> gptparts;
 	struct gptpart *gpttable;
-	string drive;
+	string drive, yesno;
 	uint64_t disk_len;
 	uint32_t first_ebr = 0, curr_ebr = 0;
-	bool write = false, badlayout = false, boot = false, keepmbr = false;
+	bool write = false, badlayout = false, boot = false, keepmbr = false,
+		 bootnofail = false;
 	unsigned int table_len = 0, record_count = 128, block_size = 0;
 
 	setup_endian();
@@ -652,6 +655,8 @@ int main(int argc, char *argv[])
 			write = true;
 		} else if (!strcmp(argv[i], "-m") || !strcmp(argv[i], "--keepmbr")) {
 			keepmbr = true;
+  		} else if (!strcmp(argv[i], "-k") || !strcmp(argv[i], "--keep-going")) {
+			bootnofail = true;
 		} else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help") ||
 				   !strcmp(argv[i], "--usage")) {
 			usage(argv[0]);
@@ -910,10 +915,17 @@ int main(int argc, char *argv[])
 		gptparts.push_back(gptout);
 	}
 	
-	if (boot)
+	if (boot) {
 		cout << endl << "WARNING: Boot partition(s) found. This tool cannot "
 			 << "guarantee that" << endl << "such partitions will remain "
 			 << "bootable after conversion." << endl;
+		if (!bootnofail)
+			cout << "Do you want to continue? [Y/N] ";
+			cin >> yesno;
+			if (yesno != "y" && yesno != "Y")
+			    return EXIT_FAILURE;
+		}
+	}
 			 
 	cout << endl;
 	
