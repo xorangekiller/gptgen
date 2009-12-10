@@ -1,4 +1,4 @@
-README for gptgen v0.99
+README for gptgen v1.0
 
 1. Introduction
 
