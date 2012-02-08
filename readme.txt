@@ -1,4 +1,4 @@
-README for gptgen v1.0
+README for gptgen v1.1
 
 1. Introduction
 
@@ -15,7 +15,7 @@ Gptgen is licensed under the ISC license, the full text of which is
 reproduced below:
 
 -----------------------------------------------------------------------
-Copyright (c) 2009, Gábor A. Stefanik <netrolller.3d@gmail.com>
+Copyright (c) 2009-2012, Gábor A. Stefanik <netrolller.3d@gmail.com>
 
 Permission to use, copy, modify, and/or distribute this software for
 any purpose with or without fee is hereby granted, provided that the
@@ -112,6 +112,8 @@ You can override this using the -c (--count) parameter, e.g.
 as some implementations have problems recognizing GPTs with other than
 128 entries.
 
+The parameter "-b <filename>" tells gptgen to back up the original MBR
+of the target drive into the file indicated by <filename>.
 
 5. Compiling and installing
 On Linux, you can build gptgen using make. To install it,
@@ -119,4 +121,20 @@ run "make install". This installs gptgen to /usr/local/sbin by default,
 to install to a different location, use "make prefix=<prefix> install".
 This will install gptgen to <prefix>/sbin.
 
-On Windows, use Dev-C++ to compile.
+On Windows, use Dev-C++ or Code::Blocks to compile.
+
+6. Version history
+
+v0.1:
+-First proof-of-concept code.
+
+v1.0:
+-Original production release.
+
+v1.1: 
+-Added "-b" ("--backup") option for backing up the original MBR.
+-Added support for Acer/Lenovo recovery partitions (ID 0x12).
+-Fixed a crash in the argument parsing code.
+-The hidden status of Windows Recovery Environment partitions
+ is now preserved correctly.
+-Added Code::Blocks support.

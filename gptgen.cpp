@@ -1,9 +1,9 @@
 /******************************************************************************\
-* gptgen version 1.0                                                           *
+* gptgen version 1.1                                                           *
 * Utility for converting MBR/MSDOS-partitioned disk drives                     *
 * to GUID Partition Table.                                                     *
 *                                                                              *
-* Copyright (c) 2009, Gabor A. Stefanik <netrolller.3d@gmail.com>              *
+* Copyright (c) 2009-2012, Gabor A. Stefanik <netrolller.3d@gmail.com>         *
 *                                                                              *
 * Permission to use, copy, modify, and/or distribute this software for any     *
 * purpose with or without fee is hereby granted, provided that the above       *
@@ -111,7 +111,7 @@ uint64_t (*cpu_to_le64) (uint64_t x);
 \******************************************************************************/
 void setup_endian() {
 	unsigned char test[2] = {0x00, 0xFF};
-	
+
 	if (*(uint16_t *)test == 0xFF00) { // little endian
 		cpu_to_be16 = swap16;
 		cpu_to_be32 = swap32;
@@ -290,7 +290,7 @@ static uint32_t crc32_tbl[256] = {
 uint32_t crc32(const unsigned char *buf, int len)
 {
 	uint32_t crc32val;
-	
+
 	crc32val = ~0L;
 	for (int i = 0; i < len; i++)
 		crc32val = crc32_tbl[(crc32val ^ buf[i]) & 0xff] ^ (crc32val >> 8);
@@ -320,7 +320,7 @@ int read_block(string drive, uint64_t lba, int block_size, char *buf)
 	HANDLE fin;
 	DWORD writelen;
 	LARGE_INTEGER offset;
-	
+
 	offset.QuadPart = lba*block_size;
 
 	fin = CreateFile(drive.c_str(), GENERIC_READ,
@@ -331,11 +331,11 @@ int read_block(string drive, uint64_t lba, int block_size, char *buf)
 		CloseHandle(fin);
 		return -1;
 	}
-	
+
 	SetFilePointerEx(fin, offset, NULL, FILE_BEGIN);
 	ReadFile(fin, buf, block_size, &writelen, NULL);
 	CloseHandle(fin);
-	
+
 	return 0;
 }
 
@@ -352,7 +352,7 @@ int write_data(string drive, uint64_t lba, int block_size, char *buf, int len)
 	HANDLE fout;
 	DWORD writelen;
 	LARGE_INTEGER offset;
-	
+
 	offset.QuadPart = lba*block_size;
 
 	fout = CreateFile(drive.c_str(), GENERIC_READ|GENERIC_WRITE,
@@ -363,7 +363,7 @@ int write_data(string drive, uint64_t lba, int block_size, char *buf, int len)
 		CloseHandle(fout);
 		return -1;
 	}
-	
+
 	SetFilePointerEx(fout, offset, NULL, FILE_BEGIN);
 	WriteFile(fout, buf, len*block_size, &writelen, NULL);
 	CloseHandle(fout);
@@ -379,7 +379,7 @@ int get_block_size(string drive)
 	HANDLE fin;
 	DWORD writelen;
 	DISK_GEOMETRY geom;
-	
+
 	fin = CreateFile(drive.c_str(), GENERIC_READ,
 					 FILE_SHARE_READ|FILE_SHARE_WRITE,
 					 NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -388,11 +388,11 @@ int get_block_size(string drive)
 		CloseHandle(fin);
 		return 0;
 	}
-	
+
 	DeviceIoControl(fin, IOCTL_DISK_GET_DRIVE_GEOMETRY, NULL, 0, &geom,
 					sizeof(DISK_GEOMETRY), &writelen, NULL);
 	CloseHandle(fin);
-	
+
 	return geom.BytesPerSector;
 }
 
@@ -405,7 +405,7 @@ uint64_t get_capacity(string drive)
 	HANDLE fin;
 	DWORD writelen;
 	GET_LENGTH_INFORMATION capacity;
-	
+
 	fin = CreateFile(drive.c_str(), GENERIC_READ,
 					 FILE_SHARE_READ|FILE_SHARE_WRITE,
 					 NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -414,11 +414,11 @@ uint64_t get_capacity(string drive)
 		CloseHandle(fin);
 		return 0;
 	}
-	
+
 	DeviceIoControl(fin, IOCTL_DISK_GET_LENGTH_INFO, NULL, 0, &capacity,
 					sizeof(GET_LENGTH_INFORMATION), &writelen, NULL);
 	CloseHandle(fin);
-	
+
 	return capacity.Length.QuadPart;
 }
 #else
@@ -432,7 +432,7 @@ uint64_t get_capacity(string drive)
 int read_block(string drive, uint64_t lba, int block_size, char *buf)
 {
 	ifstream fin;
-	
+
 	fin.open(drive.c_str(), ios_base::binary);
 	if (!fin)
 		return -1;
@@ -453,7 +453,7 @@ int read_block(string drive, uint64_t lba, int block_size, char *buf)
 int write_data(string drive, uint64_t lba, int block_size, char *buf, int len)
 {
 	ofstream fout;
-	
+
 	fout.open(drive.c_str(), ios_base::binary);
 	if (!fout)
 		return -1;
@@ -477,21 +477,21 @@ uint64_t get_capacity(string drive)
 	int fin = open(drive.c_str(), O_RDONLY);
 	if (!fin)
 		return 0;
-	
+
 #ifdef BLKGETSIZE64
 	if (ioctl(fin, BLKGETSIZE64, &ret)) {
-		close(fin);	
+		close(fin);
 		return 0;
 	}
 #else
 	if (ioctl(fin, BLKGETSIZE, &ret)) {
-		close(fin);	
+		close(fin);
 		return 0;
 	}
 	ret *= 512;
 #endif
 	close(fin);
-	
+
 	return ret;
 }
 
@@ -505,13 +505,13 @@ int get_block_size(string drive)
 	int fin = open(drive.c_str(), O_RDONLY);
 	if (fin == -1)
 		return 0;
-	
+
 	if (ioctl(fin, BLKSSZGET, &ret) < 0) {
 		close(fin);
 		return 0;
 	}
 	close(fin);
-	
+
 	return ret;
 }
 
@@ -520,7 +520,7 @@ uint64_t get_capacity(string drive)
 {
 	ifstream fin;
 	uint64_t ret;
-	
+
 	fin.open(drive.c_str(), ios_base::binary);
 	if (!fin)
 		return 0;
@@ -543,7 +543,7 @@ int read_tbl(string drive, uint64_t lba, int block_size, char *buf)
 {
 	char tmpbuf[block_size];
 	int ret;
-	
+
 	ret = read_block(drive, lba, block_size, tmpbuf);
 	if (ret >= 0) memcpy(buf, tmpbuf+446, 64);
 	return ret;
@@ -561,7 +561,7 @@ int read_mbr(string drive, uint64_t lba, int block_size, char *buf)
 {
 	char tmpbuf[block_size];
 	int ret;
-	
+
 	ret = read_block(drive, lba, block_size, tmpbuf);
 	if (ret >= 0) memcpy(buf, tmpbuf, 446);
 	return ret;
@@ -610,9 +610,11 @@ void usage(char *name)
 #else
 		 << "/dev/hda or /dev/sda."
 #endif
-		 << endl;
+		 << endl << endl;
 	cout << "Available arguments (no \"-wm\"-style "
 		 << "argument combining support):" << endl;
+	cout << "-b <file>, --backup <file>: write a backup "
+		 << "of the original MBR to <file>" << endl;
 	cout << "-c nnn, --count nnn: build a "
 		 << "GPT containing nnn entries (default=128)" << endl;
 	cout << "-h, --help, --usage: display this help message" << endl;
@@ -634,7 +636,7 @@ int main(int argc, char *argv[])
 	struct mbrpart curr[4];
 	vector<struct gptpart> gptparts;
 	struct gptpart *gpttable;
-	string drive, yesno;
+	string drive, yesno, backup = "";
 	uint64_t disk_len;
 	uint32_t first_ebr = 0, curr_ebr = 0;
 	bool write = false, badlayout = false, boot = false, keepmbr = false,
@@ -644,11 +646,11 @@ int main(int argc, char *argv[])
 	setup_endian();
 
 	memset((void *)curr, 0, 64);
-	
+
 	cout << argv[0] << ": Partition table converter "
-		 << "v1.0" << endl;
+		 << "v1.1" << endl;
 	cout << endl;
-	
+
 	// XXX The command-line parsing code has room for improvements...
 	for (int i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-w") || !strcmp(argv[i], "--write")) {
@@ -663,7 +665,22 @@ int main(int argc, char *argv[])
 			return EXIT_SUCCESS;
 		} else if (!strcmp(argv[i], "-c") || !strcmp(argv[i], "--count")) {
 			i++;
+			if (i >= argc || argv[i][0] == '-') {
+				cout << "Missing argument for -c (--count)." << endl;
+				return EXIT_FAILURE;
+			}
 			record_count = atoi(argv[i]);
+			if (record_count <= 0) {
+				cout << "Invalid argument for -c (--count)." << endl;
+				return EXIT_FAILURE;
+			}
+		} else if (!strcmp(argv[i], "-b") || !strcmp(argv[i], "--backup")) {
+			i++;
+			if (i >= argc || argv[i][0] == '-') {
+				cout << "Missing argument for -b (--backup)." << endl;
+				return EXIT_FAILURE;
+			}
+			backup = string(argv[i]);
 		} else if (argv[i][0] == '-') {
 			usage(argv[0]);
 			cout << argv[0] << ": Invalid argument: " << argv[i] << "." << endl;
@@ -679,12 +696,12 @@ int main(int argc, char *argv[])
 			}
 		}
 	}
-	
+
 	if (argc <= 1) {
 		usage(argv[0]);
 		return EXIT_SUCCESS;
 	}
-	
+
 	if (!drive.length()) {
 		usage(argv[0]);
 		cout << argv[0] << ": No drive specified." << endl;
@@ -698,7 +715,7 @@ int main(int argc, char *argv[])
 			 << ">";
 		cin >> block_size;
 	}
-	
+
 	// read and parse the MBR
 	if (read_tbl(drive, curr_ebr, block_size, (char *)curr) < 0) {
 		cout << "Block read failed, check permissions!" << endl;
@@ -706,7 +723,7 @@ int main(int argc, char *argv[])
 	}
 	first_ebr = parse_tbl(curr, 0, 0);
 	curr_ebr = first_ebr;
-	
+
 	// read and parse the EBR chain, if present
 	while (curr_ebr > 0) {
 		if (read_tbl(drive, curr_ebr, block_size, (char *)curr) < 0) {
@@ -715,7 +732,7 @@ int main(int argc, char *argv[])
 		}
 		curr_ebr = parse_tbl(curr, curr_ebr, first_ebr);
 	};
-	
+
 	disk_len = get_capacity(drive)/block_size;
 	if (!disk_len) {
 		cout << "Unable to auto-determine the capacity of the disk." << endl;
@@ -726,7 +743,7 @@ int main(int argc, char *argv[])
 
 	table_len = (int)ceil((double)(record_count * sizeof(gptpart)) /
 						  (double)block_size);
-	
+
 	if (parts.size() && parts[0].start < table_len+2) {
 		cout << "Not enough space at the beginning of the disk (need at least"
 			 << table_len+2 << " sectors before" << endl
@@ -735,7 +752,7 @@ int main(int argc, char *argv[])
 			 << "run this utility again." << endl;
 		badlayout = true;
 	}
-	
+
 	if (parts.size() &&
 		parts[parts.size()-1].start + parts[parts.size()-1].len >
 		disk_len - (table_len+2)) {
@@ -747,16 +764,16 @@ int main(int argc, char *argv[])
 			 << "run this utility again." << endl;
 		badlayout = true;
 	}
-	
+
 	if (badlayout)
 		return EXIT_FAILURE;
-	
+
 	sort(parts.begin(), parts.end(), cmp);
-	
+
 	for (unsigned int i = 0; i < parts.size(); i++) {
 		struct gptpart gptout;
-		
-		cout << "Boot: " << parts[i].active << ", Type: 0x" 
+
+		cout << "Boot: " << parts[i].active << ", Type: 0x"
 			 << hex << (int)parts[i].type << dec
 			 << ", Start: sector " << parts[i].start
 			 << ", Length: " << parts[i].len << " sectors" << endl;
@@ -768,6 +785,7 @@ int main(int argc, char *argv[])
 		gptout.flags = 0;
 		switch (parts[i].type) {
 		case 0x11:
+		case 0x12: // Acer/Lenovo hidden recovery partition
 		case 0x14:
 		case 0x16:
 		case 0x17:
@@ -790,11 +808,12 @@ int main(int argc, char *argv[])
 				gptout.type = gtmp;
 			}
 			break;
-		case 0x27:
+		case 0x27: // Also Acer hidden recovery partition - close enough
 			{
 				__guid gtmp = MS_WINRE_GUID;
 				gptout.type = gtmp;
 			}
+			gptout.flags |= cpu_to_le64(PART_FLAG_HIDDEN);
 			break;
 		case 0x3C:
 			cout << "ERROR: PartitionMagic work partition (ID 0x3C) detected."
@@ -897,7 +916,7 @@ int main(int argc, char *argv[])
 			break;
 		default:
 			cout << "WARNING: Unknown partition type in record " << i
-			<< " (" << hex << (int)parts[i].type << dec << ")." << endl;
+			<< " (0x" << hex << (int)parts[i].type << dec << ")." << endl;
 			cout << "A generic GUID will be used." << endl;
 			{
 				__guid gtmp = MBR2GUID(parts[i].type);
@@ -914,7 +933,7 @@ int main(int argc, char *argv[])
 		memset((void *)gptout.name, 0x20, 72);
 		gptparts.push_back(gptout);
 	}
-	
+
 	if (boot) {
 		cout << endl << "WARNING: Boot partition(s) found. This tool cannot "
 			 << "guarantee that" << endl << "such partitions will remain "
@@ -926,19 +945,19 @@ int main(int argc, char *argv[])
 			    return EXIT_FAILURE;
 		}
 	}
-			 
+
 	cout << endl;
-	
+
 	gpttable = (struct gptpart *)calloc(record_count, sizeof(gptpart));
 	/* Generate a complete partition array */
 	for (unsigned int i = 0; i < parts.size(); i++)
 		gpttable[i] = gptparts[i];
 	for (unsigned int i = parts.size(); i < record_count; i++)
 		gpttable[i] = empty_record;
-	
+
 	int table_crc = crc32((unsigned char *)gpttable,
 						  sizeof(gptpart) * record_count);
-	
+
 	struct gpthdr hdr1 = {
 		GPT_MAGIC,
 		GPT_V1,
@@ -955,7 +974,7 @@ int main(int argc, char *argv[])
 		cpu_to_le32(sizeof(gptpart)),
 		table_crc,
 	};
-	
+
 	struct gpthdr hdr2 = {
 		GPT_MAGIC,
 		GPT_V1,
@@ -972,10 +991,10 @@ int main(int argc, char *argv[])
 		cpu_to_le32(sizeof(gptpart)),
 		table_crc,
 	};
-	
+
 	hdr1.hdrsum = cpu_to_le32(crc32((unsigned char *)&hdr1, 92));
 	hdr2.hdrsum = cpu_to_le32(crc32((unsigned char *)&hdr2, 92));
-	
+
 	struct mbrpart prot_mbr = {
 		0,
 		0,
@@ -988,15 +1007,32 @@ int main(int argc, char *argv[])
 		1,
 		(disk_len-1 < 0xFFFFFFFF) ? disk_len-1 : 0xFFFFFFFF,
 	};
-	
+
+	if (backup != "") {
+		cout << "Backing up original MBR to file " << backup << "..." << endl;
+
+		char *bakbuf = (char *)malloc(block_size);
+
+		if (read_block(drive, 0, block_size, bakbuf) < 0) {
+			cout << "Block read failed!" << endl;
+			free(gpttable);
+			free(bakbuf);
+			return EXIT_FAILURE;
+		}
+
+		fout.open(backup.c_str(), ios_base::binary);
+		fout.write(bakbuf, block_size);
+		fout.close();
+	}
+
 	if (write) { // FIXME Write-to-disk could be improved...
 		cout << "Writing primary GPT ";
 		if (!keepmbr) cout << "and protective MBR ";
 		cout << "to LBA address " << (keepmbr ? "1" : "0") << "..." << endl;
-		
+
 		char *outbuf = (char *)malloc(block_size*(table_len+2));
 		memset((char *)outbuf, 0, block_size*(table_len+2));
-		
+
 		if (!keepmbr) {
 			// grab the MBR loader code and put it into the protective MBR
 			if (read_mbr(drive, 0, block_size, outbuf) < 0) {
@@ -1032,7 +1068,7 @@ int main(int argc, char *argv[])
 				return EXIT_FAILURE;
 			}
 		}
-		
+
 		cout << "Writing secondary GPT to LBA address "
 			 << disk_len-(table_len+1) << "..." << endl;
 		memset((char *)outbuf, 0, block_size*(table_len+2));
@@ -1054,11 +1090,11 @@ int main(int argc, char *argv[])
 		cout << "Writing primary GPT ";
 		if (!keepmbr) cout << "and protective MBR ";
 		cout << "to primary.img..." << endl;
-		
+
 		fout.open("primary.img", ios_base::binary);
 		if (!keepmbr) {
 			char mbrbuf[446];
-			
+
 			// grab the MBR loader code and put it into the protective MBR
 			if (read_mbr(drive, 0, block_size, mbrbuf) < 0) {
 				cout << "Block read failed!" << endl;
