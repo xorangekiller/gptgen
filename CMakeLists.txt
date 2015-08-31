@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(gptgen VERSION 1.1 LANGUAGES CXX)
+project(gptgen VERSION 1.2 LANGUAGES CXX)
 
 if(${CMAKE_CXX_COMPILER_ID} STREQUAL Clang)
 	set(USING_CLANG TRUE)
