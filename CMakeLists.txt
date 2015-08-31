@@ -24,3 +24,13 @@ elseif(USING_MSVC)
 endif()
 
 add_executable(gptgen "gptgen.cpp")
+
+if(NOT DEFINED GPTGEN_INSTALL_PREFIX)
+	if(WIN32)
+		set(GPTGEN_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}/gptgen")
+	else()
+		set(GPTGEN_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}/sbin")
+	endif()
+endif()
+
+install(TARGETS gptgen DESTINATION ${GPTGEN_INSTALL_PREFIX})
