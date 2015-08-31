@@ -437,7 +437,7 @@ uint64_t get_capacity(string drive)
 #else
 /******************************************************************************\
 * read_block: read a logical block of data from a device                       *
-* drive: filename of the device (e.g. /dev/hda or /dev/sda)                    *
+* drive: filename of the device (e.g. /dev/sda or /dev/mmcblk0)                *
 * lba: logical address of the block to parse                                   *
 * block_size: size of a block on the device                                    *
 * buf: buffer to read data into                                                *
@@ -457,7 +457,7 @@ int read_block(string drive, uint64_t lba, int block_size, char *buf)
 
 /******************************************************************************\
 * write_data: write blocks to a device                                         *
-* drive: filename of the device (e.g. /dev/hda or /dev/sda)                    *
+* drive: filename of the device (e.g. /dev/sda or /dev/mmcblk0)                *
 * lba: logical address of the first block to write                             *
 * block_size: size of a block on the device                                    *
 * buf: buffer holding the data to be written                                   *
@@ -478,7 +478,7 @@ int write_data(string drive, uint64_t lba, int block_size, char *buf, int len)
 
 /******************************************************************************\
 * get_capacity: return the capacity of a drive in bytes, or 0 on error         *
-* drive: filename of the device (e.g. /dev/hda or /dev/sda)                    *
+* drive: filename of the device (e.g. /dev/sda or /dev/mmcblk0)                *
 \******************************************************************************/
 uint64_t get_capacity(string drive)
 {
@@ -510,7 +510,7 @@ uint64_t get_capacity(string drive)
 
 /******************************************************************************\
 * get_block_size: return the block size of a drive in bytes, or 0 on error     *
-* drive: filename of the device (e.g. /dev/hda or /dev/sda)                    *
+* drive: filename of the device (e.g. /dev/sda or /dev/mmcblk0)                *
 \******************************************************************************/
 int get_block_size(string drive)
 {
@@ -547,7 +547,7 @@ uint64_t get_capacity(string drive)
 
 /******************************************************************************\
 * read_tbl: read an MSDOS-style partition table from a block of a device       *
-* drive: filename of the device (e.g. \\.\physicaldrive0 or /dev/hda)          *
+* drive: filename of the device (e.g. \\.\physicaldrive0 or /dev/sda)          *
 * lba: logical address of the block to parse                                   *
 * block_size: size of a block on the device                                    *
 * buf: buffer to read data into                                                *
@@ -565,7 +565,7 @@ int read_tbl(string drive, uint64_t lba, int block_size, char *buf)
 
 /******************************************************************************\
 * read_mbr: read an MBR-style (446 byte) boot code from a block of a device    *
-* drive: filename of the device (e.g. \\.\physicaldrive0 or /dev/hda)          *
+* drive: filename of the device (e.g. \\.\physicaldrive0 or /dev/sda)          *
 * lba: logical address of the block to parse                                   *
 * block_size: size of a block on the device                                    *
 * buf: buffer to read data into                                                *
@@ -623,7 +623,7 @@ void usage(char *name)
 #ifdef WINDOWS_BUILD
 		 << "\\\\.\\physicaldrive0."
 #else
-		 << "/dev/hda or /dev/sda."
+		 << "/dev/sda or /dev/mmcblk0."
 #endif
 		 << endl << endl;
 	cout << "Available arguments (no \"-wm\"-style "
