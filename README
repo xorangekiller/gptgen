@@ -1,6 +1,8 @@
 README for gptgen v1.1
+======================
 
 1. Introduction
+---------------
 
 Gptgen is a tool for converting hard drives partitioned according to
 the MSDOS-style "MBR" scheme to the GPT (GUID partition table)
@@ -9,32 +11,8 @@ Extended/logical partitions are supported, though GPT doesn't
 differentiate between primary and logical partitions, so after
 conversion, all partitions will be de facto primary.
 
-2. License
-
-Gptgen is licensed under the ISC license, the full text of which is
-reproduced below:
-
------------------------------------------------------------------------
-Copyright (c) 2009-2012, Gábor A. Stefanik <netrolller.3d@gmail.com>
-
-Permission to use, copy, modify, and/or distribute this software for
-any purpose with or without fee is hereby granted, provided that the
-above copyright notice and this permission notice appear in all copies.
-
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRAN-
-TIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
------------------------------------------------------------------------
-
-(I wish to encourage partitioning software vendors, both free and prop-
-rietary, to implement this feature in their products. Feel free to
-reuse this code for that purpose.)
-
-3. Caveats
+2. Caveats
+----------
 
 * Because GPT's partition types do not map exactly to MBR types,
   the conversion might not be perfectly accurate, especially when mul-
@@ -47,6 +25,7 @@ reuse this code for that purpose.)
   example of a collision is type 0xAF, which is used both by Mac OS X
   (to represent HFS and HFS+) and ShagOS (to represent swap space).
   Gptgen assumes 0xAF to be HFS(+).
+
 * For MBR partition types with no known matching type GUID, gptgen
   uses a generic GUID, which is as follows:
   {1575DA16-F2E2-40DE-B715-C6E376663Bxx}
@@ -54,11 +33,14 @@ reuse this code for that purpose.)
   may implement reading this ID, but it is not recommended to rely on
   this ID for creating new partitions; instead it is better to define a
   new GUID to represent the desired partition type.
+
 * Gptgen requires administrator privileges to run. On Windows Vista and
   newer Windows systems with UAC enabled, you may need to run gptgen
   from an elevated command prompt. On Linux, run with "sudo".
+
 * Big-endian support is completely untested, though necessary code is
   in place.
+
 * The GUID partition table requires that no partition can begin before
   logical block 34 (number of GPT entries*128/block size + 2 - gptgen
   defaults to 128 entries), and that there must be at least 33
@@ -74,17 +56,20 @@ reuse this code for that purpose.)
   (The actual needed sector numbers can vary with the chosen entry
   count and the drive's block size, "34" and "33" are based on a
   drive block size of 512 bytes and an entry count of 128.)
+
 * Some implementations of GPT (e.g. Windows) require certain partions
   to be present on the disk (e.g. an EFI boot partition). Gptgen
   doesn't create these partitions, it can only convert the existing
   partition table's contents. To create such partitions, use a
   GPT-ready partition manager such as parted.
+
 * Because booting is handled differently with GPT than with MBR, con-
   verting a boot drive to GPT may render it unbootable. To make a GPT
   drive bootable on BIOS, you will need to create a BIOS boot partition
   and install a GPT-aware boot loader (such as Grub 2 SVN) on it.
 
-4. Usage
+3. Usage
+--------
 
 On Windows (a precompiled Windows binary is included in the package),
 the syntax of the tool is "gptgen [-w] \\.\physicaldriveX", where X
@@ -96,7 +81,7 @@ and the secondary table to "secondary.img", in the directory that the
 program was invoked from. You can then use e.g. dd to write the tables
 to the disk.
 
-On Linux, the syntax is "gptgen [-w] /dev/hda", "/dev/hda" being the
+On Linux, the syntax is "gptgen [-w] /dev/sda", "/dev/sda" being the
 block device representing the physical drive to be converted. The -w
 option works the same way as on Windows.
 
@@ -115,26 +100,39 @@ as some implementations have problems recognizing GPTs with other than
 The parameter "-b <filename>" tells gptgen to back up the original MBR
 of the target drive into the file indicated by <filename>.
 
-5. Compiling and installing
-On Linux, you can build gptgen using make. To install it,
-run "make install". This installs gptgen to /usr/local/sbin by default,
-to install to a different location, use "make prefix=<prefix> install".
-This will install gptgen to <prefix>/sbin.
+4. Compiling and installing
+---------------------------
 
-On Windows, use Dev-C++ or Code::Blocks to compile.
+On Linux, you can build gptgen using cmake and make. To install it,
+run "make install". This installs gptgen to /usr/local/sbin by default;
+to install to a different location, use "cmake -DCMAKE_INSTALL_PREFIX=<prefix>"
+to generate the makefiles. "make install" will then install gptgen to
+<prefix>/sbin. To relocate the whole installation, use the DESTDIR
+variable on the make command line (i.e. "make DESTDIR=<install_root> install".
 
-6. Version history
+$ cmake CMakeLists.txt
+$ make
+$ sudo make install
 
-v0.1:
--First proof-of-concept code.
+On Windows, building with MinGW and Visual Studio is supported.
 
-v1.0:
--Original production release.
+Building with MinGW on Windows:
+> set path=%path%;C:\MinGW\bin;C:\Program Files (x86)\CMake\bin
+> cmake -G"MinGW Makefiles" -DCMAKE_MAKE_PROGRAM=make CMakeLists.txt
+> make
 
-v1.1: 
--Added "-b" ("--backup") option for backing up the original MBR.
--Added support for Acer/Lenovo recovery partitions (ID 0x12).
--Fixed a crash in the argument parsing code.
--The hidden status of Windows Recovery Environment partitions
- is now preserved correctly.
--Added Code::Blocks support.
+Building with Visual Studio 2012 on Windows (may be adjusted for other
+versions of Visual Studio):
+> set path=%path%;C:\Program Files (x86)\CMake\bin
+> "C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\vcvarsall.bat" x86
+> cmake -G"NMake Makefiles" -DCMAKE_MAKE_PROGRAM=nmake CMakeLists.txt
+> nmake
+
+Generating Visual Studio 2012 project files on Windows (may be adjusted for
+other versions of Visual Studio):
+> set path=%path%;C:\Program Files (x86)\CMake\bin
+> cmake -G"Visual Studio 11" CMakeLists.txt
+Open "gptgen.vcxproj" with Visual Studio.
+
+To build gptgen with debug support add the following arguments on the CMake
+command line: "-DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=TRUE"

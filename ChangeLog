@@ -1,0 +1,19 @@
+2012-02-08  Gábor A. Stefanik <netrolller.3d@gmail.com>
+
+    version 1.1
+    * Added "-b" ("--backup") option for backing up the original MBR.
+    * Added support for Acer/Lenovo recovery partitions (ID 0x12).
+    * Fixed a crash in the argument parsing code.
+    * The hidden status of Windows Recovery Environment partitions is
+      now preserved correctly.
+    * Added Code::Blocks support.
+
+2009-12-10  Gábor A. Stefanik <netrolller.3d@gmail.com>
+
+    version 1.0
+    * Original production release
+
+2009-07-30  Gábor A. Stefanik <netrolller.3d@gmail.com>
+
+    version 0.1
+    * First proof-of-concept code
