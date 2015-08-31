@@ -26,14 +26,29 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <stdint.h>
 
-#ifdef WE_ARE_WINDOWS
+#ifdef WINDOWS_BUILD
 #include <windows.h>
 #include <winioctl.h>
 #else
-#include <fcntl.h>
-#include <linux/fs.h>
 #include <sys/ioctl.h>
+#include <linux/fs.h>
+#include <fcntl.h>
+#include <unistd.h>
+#endif
+
+// We don't have unistd.h on Windows, so define the missing integer types.
+#ifdef WINDOWS_BUILD
+typedef uint64_t __be64;
+#endif
+
+#if defined(__GNUC__)
+#define ATTRIBUTE_PACKED __attribute__((packed))
+#elif defined(_MSC_VER)
+#define ATTRIBUTE_PACKED __pragma(pack(pop, r1))
+#else
+#error "Cannot eliminate structure padding"
 #endif
 
 using namespace std;
@@ -45,8 +60,6 @@ using namespace std;
 #define PART_FLAG_RDONLY (1ULL<<60)
 #define PART_FLAG_HIDDEN (1ULL<<62)
 #define PART_FLAG_NOMOUNT (1ULL<<63)
-
-typedef uint64_t __be64;
 
 /******************************************************************************\
 * swapXX, keepXX, cpu_to_XeXX: endianness helper functions/pointers            *
@@ -134,7 +147,7 @@ struct __guid {
 	uint16_t data2;
 	uint16_t data3;
 	__be64 data4;
-}__attribute__((packed));
+}ATTRIBUTE_PACKED;
 
 #define NULL_GUID {0x00000000, 0x0000, 0x0000, 0x0000000000000000}
 #define EFI_SYS_GUID {cpu_to_le32(0xC12A7328), cpu_to_le16(0xF81F),\
@@ -187,7 +200,7 @@ struct mbrpart {
 	unsigned char ecyl; // CHS end value, not used by program
 	uint32_t start;
 	uint32_t len;
-}__attribute__((packed));
+}ATTRIBUTE_PACKED;
 
 struct gptpart {
 	struct __guid type;
@@ -196,7 +209,7 @@ struct gptpart {
 	uint64_t end;
 	uint64_t flags;
 	char name[72];
-}__attribute__((packed));
+}ATTRIBUTE_PACKED;
 
 const static gptpart empty_record = {
 	NULL_GUID,
@@ -222,7 +235,7 @@ struct gpthdr {
 	uint32_t entry_cnt;
 	uint32_t entry_len;
 	uint32_t part_sum;
-}__attribute__((packed));
+}ATTRIBUTE_PACKED;
 
 vector<struct part> parts;
 
@@ -307,7 +320,7 @@ bool cmp(part a, part b)
 	return a.start < b.start;
 }
 
-#ifdef WE_ARE_WINDOWS
+#ifdef WINDOWS_BUILD
 /******************************************************************************\
 * read_block: read a logical block of data from a device                       *
 * drive: filename of the device (e.g. \\.\physicaldrive0)                      *
@@ -541,11 +554,12 @@ uint64_t get_capacity(string drive)
 \******************************************************************************/
 int read_tbl(string drive, uint64_t lba, int block_size, char *buf)
 {
-	char tmpbuf[block_size];
+	char* tmpbuf = new char[block_size];
 	int ret;
 
 	ret = read_block(drive, lba, block_size, tmpbuf);
 	if (ret >= 0) memcpy(buf, tmpbuf+446, 64);
+	delete [] tmpbuf;
 	return ret;
 }
 
@@ -559,11 +573,12 @@ int read_tbl(string drive, uint64_t lba, int block_size, char *buf)
 
 int read_mbr(string drive, uint64_t lba, int block_size, char *buf)
 {
-	char tmpbuf[block_size];
+	char* tmpbuf = new char[block_size];
 	int ret;
 
 	ret = read_block(drive, lba, block_size, tmpbuf);
 	if (ret >= 0) memcpy(buf, tmpbuf, 446);
+	delete [] tmpbuf;
 	return ret;
 }
 
@@ -605,7 +620,7 @@ void usage(char *name)
 	cout << "Usage: " << name << " [<arguments>] <device_path>" << endl;
 	cout << "where device_path is the full path to the device file," << endl;
 	cout << "e.g."
-#ifdef WE_ARE_WINDOWS
+#ifdef WINDOWS_BUILD
 		 << "\\\\.\\physicaldrive0."
 #else
 		 << "/dev/hda or /dev/sda."
@@ -972,7 +987,7 @@ int main(int argc, char *argv[])
 		cpu_to_le64(2ULL),
 		cpu_to_le32(record_count),
 		cpu_to_le32(sizeof(gptpart)),
-		table_crc,
+		static_cast<uint32_t>(table_crc)
 	};
 
 	struct gpthdr hdr2 = {
@@ -989,7 +1004,7 @@ int main(int argc, char *argv[])
 		cpu_to_le64(disk_len-(table_len+1)),
 		cpu_to_le32(record_count),
 		cpu_to_le32(sizeof(gptpart)),
-		table_crc,
+		static_cast<uint32_t>(table_crc)
 	};
 
 	hdr1.hdrsum = cpu_to_le32(crc32((unsigned char *)&hdr1, 92));
@@ -1005,7 +1020,7 @@ int main(int argc, char *argv[])
 		0xFF,
 		0xFF,
 		1,
-		(disk_len-1 < 0xFFFFFFFF) ? disk_len-1 : 0xFFFFFFFF,
+		static_cast<uint32_t>((disk_len-1 < 0xFFFFFFFF) ? disk_len-1 : 0xFFFFFFFF)
 	};
 
 	if (backup != "") {
