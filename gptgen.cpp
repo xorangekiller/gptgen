@@ -554,7 +554,7 @@ uint64_t get_capacity(string drive)
 \******************************************************************************/
 int read_tbl(string drive, uint64_t lba, int block_size, char *buf)
 {
-	char* tmpbuf = new char[block_size];
+	char *tmpbuf = new char[block_size];
 	int ret;
 
 	ret = read_block(drive, lba, block_size, tmpbuf);
@@ -573,7 +573,7 @@ int read_tbl(string drive, uint64_t lba, int block_size, char *buf)
 
 int read_mbr(string drive, uint64_t lba, int block_size, char *buf)
 {
-	char* tmpbuf = new char[block_size];
+	char *tmpbuf = new char[block_size];
 	int ret;
 
 	ret = read_block(drive, lba, block_size, tmpbuf);
