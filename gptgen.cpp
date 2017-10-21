@@ -945,7 +945,8 @@ int main(int argc, char *argv[])
 		gptout.start = cpu_to_le64((uint64_t)le32_to_cpu(parts[i].start));
 		gptout.end = cpu_to_le64(((uint64_t)le32_to_cpu(parts[i].start) +
 								 (uint64_t)le32_to_cpu(parts[i].len) - 1));
-		memset((void *)gptout.name, 0x20, 72);
+		memset(gptout.name, 0, 72);
+		memcpy(gptout.name, "B\0a\0s\0i\0c\0 \0d\0a\0t\0a\0 \0p\0a\0r\0t\0i\0t\0i\0o\0n\0", 40);
 		gptparts.push_back(gptout);
 	}
 
