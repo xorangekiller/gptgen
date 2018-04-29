@@ -1,8 +1,7 @@
 README for gptgen v1.2.1
 ========================
 
-1. Introduction
----------------
+## 1. Introduction
 
 Gptgen is a tool for converting hard drives partitioned according to
 the MSDOS-style "MBR" scheme to the GPT (GUID partition table)
@@ -11,8 +10,7 @@ Extended/logical partitions are supported, though GPT doesn't
 differentiate between primary and logical partitions, so after
 conversion, all partitions will be de facto primary.
 
-2. Caveats
-----------
+## 2. Caveats
 
 * Because GPT's partition types do not map exactly to MBR types,
   the conversion might not be perfectly accurate, especially when
@@ -69,8 +67,7 @@ conversion, all partitions will be de facto primary.
   and install a GPT-aware boot loader (such as GRUB 2.02 or later) on
   it.
 
-3. Usage
---------
+## 3. Usage
 
 On Windows (a precompiled Windows binary is included in the package),
 the syntax of the tool is `gptgen [-w] \\.\physicaldriveX`, where "X"
@@ -101,8 +98,7 @@ as some implementations have problems recognizing GPTs with other than
 The parameter `-b <filename>` tells gptgen to back up the original MBR
 of the target drive into the file indicated by `<filename>`.
 
-4. Compiling and installing
----------------------------
+## 4. Compiling and installing
 
 On Linux, you can build gptgen using `cmake` and `make`. To install it,
 run `make install`. This installs gptgen to `/usr/local/sbin` by
