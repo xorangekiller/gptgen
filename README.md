@@ -1,5 +1,5 @@
-README for gptgen v1.2
-======================
+README for gptgen v1.2.1
+========================
 
 1. Introduction
 ---------------

@@ -1,3 +1,13 @@
+2018-04-29  Karl Lenz <xorangekiller@gmail.com>
+
+    version 1.2.1
+    * Updated the Windows build instructions for newer versions of
+      Visual Studio (with integrated CMake support), and rewrote the
+      README in Markdown.
+    * Fixed partition naming to be more useful (rather than just 36
+      UTF-16 dagger (U+0x2020) characters like before). Thanks Phillip
+      Hellewell for finding and fixing it!
+
 2015-08-30  Karl Lenz <xorangekiller@gmail.com>
 
     version 1.2
