@@ -726,7 +726,7 @@ int main(int argc, char *argv[])
 	block_size = get_block_size(drive);
 	if (!block_size) {
 		cout << "Unable to auto-determine the block size of the disk." << endl;
-		cout << "Please enter the the block size by hand to continue." << endl
+		cout << "Please enter the block size by hand to continue." << endl
 			 << ">";
 		cin >> block_size;
 	}
