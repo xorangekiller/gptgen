@@ -21,6 +21,8 @@ if(USING_CLANG OR USING_GCC)
 	endif()
 elseif(USING_MSVC)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DWINDOWS_BUILD")
+elseif(APPLE)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMACOS_BUILD")
 endif()
 
 add_executable(gptgen "gptgen.cpp")

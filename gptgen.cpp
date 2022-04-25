@@ -31,6 +31,11 @@
 #ifdef WINDOWS_BUILD
 #include <windows.h>
 #include <winioctl.h>
+#elif MACOS_BUILD
+#include <sys/ioctl.h>
+#include <sys/disk.h>
+#include <fcntl.h>
+#include <unistd.h>
 #else
 #include <sys/ioctl.h>
 #include <linux/fs.h>
@@ -41,6 +46,11 @@
 // We don't have unistd.h on Windows, so define the missing integer types.
 #ifdef WINDOWS_BUILD
 typedef uint64_t __be64;
+#elif MACOS_BUILD
+typedef uint64_t __u64;
+typedef uint64_t __be64;
+#define BLKSSZGET DKIOCGETBLOCKSIZE
+#define BLKGETSIZE DKIOCGETBLOCKCOUNT
 #endif
 
 #if defined(__GNUC__)
@@ -484,6 +494,8 @@ uint64_t get_capacity(string drive)
 {
 #ifdef BLKGETSIZE64
 	uint64_t ret = 0;
+#elif MACOS_BUILD
+	uint64_t ret = 0;
 #else
 	uint32_t ret = 0;
 #endif
@@ -619,9 +631,11 @@ void usage(char *name)
 {
 	cout << "Usage: " << name << " [<arguments>] <device_path>" << endl;
 	cout << "where device_path is the full path to the device file," << endl;
-	cout << "e.g."
+	cout << "e.g. "
 #ifdef WINDOWS_BUILD
 		 << "\\\\.\\physicaldrive0."
+#elif MACOS_BUILD
+		 << "/dev/disk0"
 #else
 		 << "/dev/sda or /dev/mmcblk0."
 #endif
@@ -672,7 +686,7 @@ int main(int argc, char *argv[])
 			write = true;
 		} else if (!strcmp(argv[i], "-m") || !strcmp(argv[i], "--keepmbr")) {
 			keepmbr = true;
-  		} else if (!strcmp(argv[i], "-k") || !strcmp(argv[i], "--keep-going")) {
+		} else if (!strcmp(argv[i], "-k") || !strcmp(argv[i], "--keep-going")) {
 			bootnofail = true;
 		} else if (!strcmp(argv[i], "-h") || !strcmp(argv[i], "--help") ||
 				   !strcmp(argv[i], "--usage")) {
@@ -760,8 +774,8 @@ int main(int argc, char *argv[])
 						  (double)block_size);
 
 	if (parts.size() && parts[0].start < table_len+2) {
-		cout << "Not enough space at the beginning of the disk (need at least"
-			 << table_len+2 << " sectors before" << endl
+		cout << "Not enough space at the beginning of the disk (need at least "
+			 << table_len+2 << " sectors before "
 			 << "the start of the first partition)."
 			 << endl << "Re-partition the disk to meet this requirement, and "
 			 << "run this utility again." << endl;
@@ -772,8 +786,8 @@ int main(int argc, char *argv[])
 		parts[parts.size()-1].start + parts[parts.size()-1].len >
 		disk_len - (table_len+2)) {
 		if (badlayout) cout << endl;
-		cout << "Not enough space at the end of the disk (need at least"
-			 << endl << table_len+1 << " sectors after"
+		cout << "Not enough space at the end of the disk (need at least "
+			 << table_len+1 << " sectors after "
 			 << "the end of the last partition)."
 			 << endl << "Re-partition the disk to meet this requirement, and "
 			 << "run this utility again." << endl;
@@ -958,7 +972,7 @@ int main(int argc, char *argv[])
 			cout << "Do you want to continue? [Y/N] ";
 			cin >> yesno;
 			if (yesno != "y" && yesno != "Y")
-			    return EXIT_FAILURE;
+				return EXIT_FAILURE;
 		}
 	}
 
@@ -1146,5 +1160,5 @@ int main(int argc, char *argv[])
 			 << "." << endl;
 	}
 	free(gpttable);
-    return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }
