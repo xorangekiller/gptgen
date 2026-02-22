@@ -823,6 +823,7 @@ int main(int argc, char *argv[])
 		case 0xBC: // Acronis Secure Zone, in fact hidden FAT32
 		case 0xFE:
 			gptout.flags |= cpu_to_le64(PART_FLAG_HIDDEN);
+			// fallthrough
 		case 0x01:
 		case 0x04:
 		case 0x06:
@@ -870,6 +871,7 @@ int main(int argc, char *argv[])
 #endif
 		case 0xC3:
 			gptout.flags |= cpu_to_le64(PART_FLAG_HIDDEN);
+			// fallthrough
 		case 0x82:
 			{
 				__guid gtmp = LINUX_SWAP_GUID;
@@ -879,6 +881,7 @@ int main(int argc, char *argv[])
 		case 0x93:
 		case 0xC2:
 			gptout.flags |= cpu_to_le64(PART_FLAG_HIDDEN);
+			// fallthrough
 		case 0x81: // XXX not sure if this is correct...
 		case 0x83:
 			{
