@@ -153,3 +153,51 @@ $ make
 To build gptgen with debug support, add the following arguments on the
 CMake command line:
 `-DCMAKE_BUILD_TYPE=Debug -DCMAKE_VERBOSE_MAKEFILE=TRUE`
+
+## 5. Testing
+
+Gptgen is a small, tightly integrated utility that typically requires direct
+hardware access to read or modify the disk. In theory it could be unit tested,
+but it makes more sense to just integration test it to more closely mimic how a
+real user would use it.
+
+The integration tests are implemented in a simple Bourne shell script that
+mostly just requires standard Unix system utilities (`dd`, `bc`, `grep`, etc.)
+and the [GNU Parted](https://www.gnu.org/software/parted/) partition manager.
+It has only been tested on GNU/Linux, but should work in other Unix-like
+environments as well (such as macOS, FreeBSD, or *maybe* MSYS2 on Windows) as
+long as you have the prerequisites installed. Portability of the tests to other
+systems is considered non-blocking since everyone can spin up a lightweight
+Linux container on their OS of choice to test the core, OS-agnostic gptgen
+logic, but the reverse is not true.
+
+**Installing the integration test dependencies on Debian or Ubuntu:**
+```
+$ sudo apt install parted dosfstools
+```
+
+**Running the integration tests:**
+```
+$ ./test.sh
+```
+
+**Extra tools for debugging:**
+* Set the `HEXDUMP_DISK=1` environment variable before running `test.sh` to
+  print a hex dump of the disk image used for testing at each stage with Vim's
+  [xxd](https://github.com/vim/vim/blob/master/runtime/doc/xxd.man) hex dump
+  utility.
+* Set the `SKIP_CLEANUP=1` environment variable before running `test.sh` to
+  leave the `disk.img` file after running the tests so that you can inspect it
+  yourself.
+* Run `/sbin/parted disk.img` to enter an interactive GNU Parted session to
+  inspect the disk image from the tests.
+  * Run `print free` to print the partition table and free space.
+* Run `/sbin/gdisk disk.img` to use [GPT fdisk](https://rodsbooks.com/gdisk/)
+  to inspect the GPT partition table created by gptgen in the disk image
+  created by the tests.
+  * GPT fdisk is GPT-specific, and has some more advanced tools than GNU Parted
+    for GPT partition tables, but otherwise doesn't have the broader support of
+    GNU Parted. They're both useful.
+  * Use the `v` command to inspect the partition table and report problems.
+    There should be no problems reported on a partition table created by
+    gptgen.

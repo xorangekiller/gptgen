@@ -19,5 +19,8 @@ Makefile
 /gptgen
 *.exe
 
+# Ignore temporary files created during the tests.
+*.img
+
 # Ignore the standard out-of-tree build directory.
 /build
