@@ -172,12 +172,6 @@ rm -f mbr.img
 echo "[test] Is the new partition table GPT?"
 run2_part_info="$(parted -s disk.img -- print 2>&1)"
 echo "$run2_part_info"
-# FIXME: GNU Parted and GPT fdisk can both read the GPT partition table
-# created by gptgen, but they each indicate that there are some problems with
-# it. Filter out those errors for now, and ensure that no *other* errors
-# are reported by Parted. Once this is fixed in gptgen, we can remove this
-# workaround in the tests.
-run2_part_info="$(echo "$run2_part_info" | grep -Fv 'backup GPT table is corrupt, but the primary appears OK')"
 if echo "$run2_part_info" | grep -Fqs 'Error'; then
 	echo "[test] Parted encountered an error reading the disk image."
 	exit 1

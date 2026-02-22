@@ -1022,7 +1022,7 @@ int main(int argc, char *argv[])
 		0,
 		cpu_to_le64(disk_len-1),
 		cpu_to_le64(1ULL),
-		cpu_to_le32(table_len+2ULL),
+		cpu_to_le64(table_len+2ULL),
 		cpu_to_le64(disk_len-(table_len+2)),
 		NULL_GUID,
 		cpu_to_le64(disk_len-(table_len+1)),
@@ -1113,7 +1113,7 @@ int main(int argc, char *argv[])
 			 << disk_len-(table_len+1) << "..." << endl;
 		memset((char *)outbuf, 0, block_size*(table_len+2));
 		memcpy((char *)outbuf, (char *)gpttable, record_count*sizeof(gptpart));
-		memcpy((char *)outbuf+record_count*sizeof(gptpart), (char *)&hdr1,
+		memcpy((char *)outbuf+record_count*sizeof(gptpart), (char *)&hdr2,
 				sizeof(struct gpthdr));
 		memset((char *)outbuf+record_count*sizeof(gptpart)+92, 0,
 				block_size-92);
