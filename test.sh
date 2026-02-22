@@ -116,15 +116,7 @@ original_size="$(du -b disk.img | awk '{print $1}')"
 # devices by asking the OS. For disk images, it will prompt the user to supply
 # it. Set the block size for our test disk image so that we can supply it to
 # gptgen when prompted and our tests run automatically.
-block_size=512      # disk image's block size in bytes
-lba_capacity=131072 # disk image's size in sectors (1 sector = 512 bytes)
-
-# Double-check the LBA capacity, just to make sure our hard-coded number is
-# what we expect it to be. This will change if we ever change the size or
-# how we're creating it with dd, above.
-echo "[test] Checking disk image's real LBA capacity..."
-real_lba_capacity="$(du -b disk.img | awk "{print \$1\" / $block_size\"}" | bc)"
-test "$real_lba_capacity" = "$lba_capacity"
+block_size=512 # disk image's block size in bytes
 
 if [ "$HEXDUMP_DISK" = "1" ]; then
 	echo "[test] Printing MSDOS partitioned disk image (for debugging)..."
@@ -135,7 +127,7 @@ if [ "$HEXDUMP_DISK" = "1" ]; then
 fi
 
 echo "[test] Converting MBR to GPT with default options (non-destructive)..."
-printf "${block_size}\r${lba_capacity}\rY\r" | ./gptgen disk.img
+printf "${block_size}\rY\r" | ./gptgen disk.img
 run1_hash="$(md5sum disk.img | awk '{print $1}')"
 
 echo "[test] Is the original disk image left unmodified?"
@@ -154,7 +146,7 @@ fi
 rm -f primary.img secondary.img
 
 echo "[test] Converting MBR to GPT in place (destructively on disk)..."
-printf "${block_size}\r${lba_capacity}\r" | ./gptgen -w -b mbr.img -k disk.img
+printf "${block_size}\r" | ./gptgen -w -b mbr.img -k disk.img
 run2_hash="$(md5sum disk.img | awk '{print $1}')"
 run2_size="$(du -b disk.img | awk '{print $1}')"
 

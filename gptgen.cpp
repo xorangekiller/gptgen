@@ -34,10 +34,12 @@
 #elif MACOS_BUILD
 #include <sys/ioctl.h>
 #include <sys/disk.h>
+#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #else
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <linux/fs.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -516,6 +518,13 @@ uint64_t get_capacity(string drive)
 	int fin = open(drive.c_str(), O_RDONLY);
 	if (!fin)
 		return 0;
+
+	struct stat statbuf;
+	memset(&statbuf, 0, sizeof(struct stat));
+	if (fstat(fin, &statbuf) == 0 && S_ISREG(statbuf.st_mode)) {
+		close(fin);
+		return statbuf.st_size;
+	}
 
 #ifdef BLKGETSIZE64
 	if (ioctl(fin, BLKGETSIZE64, &ret)) {
