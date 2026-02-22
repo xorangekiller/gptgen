@@ -1,5 +1,7 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 project(gptgen VERSION 1.2.1 LANGUAGES CXX)
+
+option(BUILD_STATIC "Build a fully static executable" OFF)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,6 +29,26 @@ elseif(USING_MSVC)
 	add_compile_definitions(WINDOWS_BUILD)
 elseif(APPLE)
 	add_compile_definitions(MACOS_BUILD)
+endif()
+
+if(BUILD_STATIC)
+	if(CMAKE_BUILD_TYPE STREQUAL "Release")
+		message(STATUS "Enabling static build")
+	else()
+		message(STATUS "Enabling static build (recommend setting -DCMAKE_BUILD_TYPE=Release)")
+	endif()
+
+	if(MSVC)
+		# Link the MSVC Runtime Library statically (/MT).
+		# See https://docs.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library
+		# and https://cmake.org/cmake/help/latest/variable/CMAKE_MSVC_RUNTIME_LIBRARY.html
+		set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+	else()
+		# GCC and Clang support the "-static" flag to enable fully static linking.
+		# See https://gcc.gnu.org/onlinedocs/gcc-15.2.0/gcc/Link-Options.html#index-static
+		# and https://cmake.org/cmake/help/latest/command/add_link_options.html
+		add_link_options("-static")
+	endif()
 endif()
 
 add_executable(gptgen "gptgen.cpp")
