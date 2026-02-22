@@ -118,7 +118,7 @@ $ sudo make install
 On Windows, building with both MinGW and Visual Studio is supported. For
 building with MinGW, [MSYS2](https://www.msys2.org) is recommended. For
 building with Visual Studio, you may use the freely available
-[Visual Studio Community Edition](https://www.visualstudio.com/vs/community)
+[Visual Studio Community Edition](https://visualstudio.microsoft.com/vs/community/)
 with [CMake Project support](https://docs.microsoft.com/en-us/cpp/ide/cmake-tools-for-visual-cpp).
 
 **Building with MinGW on Windows (from a MSYS2 Mingw-w64 shell prompt):**
@@ -127,15 +127,14 @@ $ cmake -DCMAKE_SYSTEM_NAME=Windows .
 $ make
 ```
 
-**Building with Visual Studio Community 2017 from the Command Prompt:**
+**Building with Visual Studio Community 2026 from the Command Prompt:**
 ```
-> "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvarsall.bat" x86_amd64
-> set path=%path%;C:\Program Files\CMake\bin
-> cmake -G"NMake Makefiles" -DCMAKE_MAKE_PROGRAM=nmake .
-> nmake
+> "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat" x86_amd64
+> cmake -GNinja .
+> ninja
 ```
 
-**Building with Visual Studio Community 2017 from the IDE:**
+**Building with Visual Studio Community 2026 from the IDE:**
 1. Open Visual Studio.
 2. Go to File->Open->CMake.
 3. Open the CMakeLists.txt in the gptgen source directory.
@@ -144,6 +143,12 @@ $ make
 6. Run CMake->Install->gptgen.
 7. You can find `gptgen.exe` in the location show in the CMake build log
    in the Visual Studio "output" pane.
+
+**Cross-compiling for Windows on Linux with Mingw-w64 (not recommended):**
+```
+$ cmake -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ .
+$ make
+```
 
 To build gptgen with debug support, add the following arguments on the
 CMake command line:
