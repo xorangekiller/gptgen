@@ -454,14 +454,20 @@ uint64_t get_capacity(string drive)
 \******************************************************************************/
 int read_block(string drive, uint64_t lba, int block_size, char *buf)
 {
-	ifstream fin;
-
-	fin.open(drive.c_str(), ios_base::binary);
+	int fin = open(drive.c_str(), O_RDONLY);
 	if (!fin)
 		return -1;
-	fin.seekg(lba*block_size);
-	fin.read(buf, block_size);
-	fin.close();
+
+	if (lseek(fin, lba*block_size, SEEK_SET) < 0) {
+		close(fin);
+		return -1;
+	}
+	if (read(fin, buf, block_size) != block_size) {
+		close(fin);
+		return -1;
+	}
+	close(fin);
+
 	return 0;
 }
 
@@ -475,14 +481,24 @@ int read_block(string drive, uint64_t lba, int block_size, char *buf)
 \******************************************************************************/
 int write_data(string drive, uint64_t lba, int block_size, char *buf, int len)
 {
-	ofstream fout;
-
-	fout.open(drive.c_str(), ios_base::binary);
+	int fout = open(drive.c_str(), O_WRONLY);
 	if (!fout)
 		return -1;
-	fout.seekp((lba*block_size));
-	fout.write(buf, len*block_size);
-	fout.close();
+
+	if (lseek(fout, lba*block_size, SEEK_SET) < 0) {
+		close(fout);
+		return -1;
+	}
+	if (write(fout, buf, len*block_size) != (len*block_size)) {
+		close(fout);
+		return -1;
+	}
+	if (fsync(fout) < 0) {
+		close(fout);
+		return -1;
+	}
+	close(fout);
+
 	return 0;
 }
 
@@ -492,9 +508,7 @@ int write_data(string drive, uint64_t lba, int block_size, char *buf, int len)
 \******************************************************************************/
 uint64_t get_capacity(string drive)
 {
-#ifdef BLKGETSIZE64
-	uint64_t ret = 0;
-#elif MACOS_BUILD
+#if defined(BLKGETSIZE64) || defined(MACOS_BUILD)
 	uint64_t ret = 0;
 #else
 	uint32_t ret = 0;
@@ -539,22 +553,6 @@ int get_block_size(string drive)
 
 	return ret;
 }
-
-#if 0
-uint64_t get_capacity(string drive)
-{
-	ifstream fin;
-	uint64_t ret;
-
-	fin.open(drive.c_str(), ios_base::binary);
-	if (!fin)
-		return 0;
-	fin.seekg(0, ios::end);
-	ret = fin.tellg();
-	fin.close;
-	return ret ? ret : 0;
-}
-#endif
 #endif
 
 /******************************************************************************\
