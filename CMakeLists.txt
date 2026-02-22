@@ -1,5 +1,9 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.12)
 project(gptgen VERSION 1.2.1 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(${CMAKE_CXX_COMPILER_ID} STREQUAL Clang)
 	set(USING_CLANG TRUE)
@@ -17,12 +21,12 @@ if(USING_CLANG OR USING_GCC)
 	set(CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT "${CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT} -O2 -ggdb")
 
 	if(WIN32)
-		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWINDOWS_BUILD")
+		add_compile_definitions(WINDOWS_BUILD)
 	endif()
 elseif(USING_MSVC)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /DWINDOWS_BUILD")
+	add_compile_definitions(WINDOWS_BUILD)
 elseif(APPLE)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DMACOS_BUILD")
+	add_compile_definitions(MACOS_BUILD)
 endif()
 
 add_executable(gptgen "gptgen.cpp")
