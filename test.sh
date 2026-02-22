@@ -154,7 +154,7 @@ fi
 rm -f primary.img secondary.img
 
 echo "[test] Converting MBR to GPT in place (destructively on disk)..."
-printf "${block_size}\r${lba_capacity}\r" | ./gptgen -w -k disk.img
+printf "${block_size}\r${lba_capacity}\r" | ./gptgen -w -b mbr.img -k disk.img
 run2_hash="$(md5sum disk.img | awk '{print $1}')"
 run2_size="$(du -b disk.img | awk '{print $1}')"
 
@@ -172,6 +172,10 @@ test "$original_size" = "$run2_size"
 echo "[test] Were the primary and secondary GPT images created?"
 test ! -e primary.img
 test ! -e secondary.img
+
+echo "[test] Was the backup MBR image created?"
+test -e mbr.img
+rm -f mbr.img
 
 echo "[test] Is the new partition table GPT?"
 run2_part_info="$(parted -s disk.img -- print 2>&1)"

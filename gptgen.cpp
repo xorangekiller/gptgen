@@ -564,12 +564,12 @@ int get_block_size(string drive)
 \******************************************************************************/
 int read_tbl(string drive, uint64_t lba, int block_size, char *buf)
 {
-	char *tmpbuf = new char[block_size];
+	char *tmpbuf = (char *)calloc(block_size, sizeof(char));
 	int ret;
 
 	ret = read_block(drive, lba, block_size, tmpbuf);
 	if (ret >= 0) memcpy(buf, tmpbuf+446, 64);
-	delete [] tmpbuf;
+	free(tmpbuf);
 	return ret;
 }
 
@@ -580,15 +580,14 @@ int read_tbl(string drive, uint64_t lba, int block_size, char *buf)
 * block_size: size of a block on the device                                    *
 * buf: buffer to read data into                                                *
 \******************************************************************************/
-
 int read_mbr(string drive, uint64_t lba, int block_size, char *buf)
 {
-	char *tmpbuf = new char[block_size];
+	char *tmpbuf = (char *)calloc(block_size, sizeof(char));
 	int ret;
 
 	ret = read_block(drive, lba, block_size, tmpbuf);
 	if (ret >= 0) memcpy(buf, tmpbuf, 446);
-	delete [] tmpbuf;
+	free(tmpbuf);
 	return ret;
 }
 
@@ -1054,6 +1053,7 @@ int main(int argc, char *argv[])
 		fout.open(backup.c_str(), ios_base::binary);
 		fout.write(bakbuf, block_size);
 		fout.close();
+		free(bakbuf);
 	}
 
 	if (write) { // FIXME Write-to-disk could be improved...
