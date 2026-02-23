@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.15)
-project(gptgen VERSION 1.2.1 LANGUAGES CXX)
+project(gptgen VERSION 1.3 LANGUAGES CXX)
 
 option(BUILD_STATIC "Build a fully static executable" OFF)
 option(USE_ASAN "Enable Address Sanitizer" OFF)

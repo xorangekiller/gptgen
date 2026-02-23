@@ -1,5 +1,5 @@
 /******************************************************************************\
-* gptgen version 1.2.1                                                         *
+* gptgen version 1.3                                                           *
 * Utility for converting MBR/MSDOS-partitioned disk drives                     *
 * to GUID Partition Table.                                                     *
 *                                                                              *
@@ -683,7 +683,7 @@ int main(int argc, char *argv[])
 	memset((void *)curr, 0, 64);
 
 	cout << argv[0] << ": Partition table converter "
-		 << "v1.2.1" << endl;
+		 << "v1.3" << endl;
 	cout << endl;
 
 	// XXX The command-line parsing code has room for improvements...
